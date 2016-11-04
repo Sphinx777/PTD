@@ -13,6 +13,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
+import org.apache.spark.ml.feature.StringIndexer;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
@@ -23,23 +24,27 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-
+import org.apache.spark.util.LongAccumulator;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
 import java.io.StringReader;
 import java.util.*;
 
 public class TopicMain {
 	public static SparkSession  sparkSession;
+	static Logger logger = Logger.getLogger(TopicMain.class.getName());
+
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 		System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
-
+		logger.info("start");
 		sparkSession = SparkSession.builder().master("local")
 									.appName("TopicDerivation")
 									.config("spark.sql.warehouse.dir","file:///")
 									.getOrCreate();
 		//System.out.println("current array max length: "+(Integer.MAX_VALUE - 8));
 
-		StructType schema = new StructType().add("polarity","string").add("tweetId", "int").add("date","string")
+		StructType schema = new StructType().add("polarity","string").add("oldTweetId", "int").add("date","string")
 				                            .add("noUse","string").add("userName","string").add("tweet","string")
 				                            .add("mentionMen","string").add("userInteraction","string");
 		
@@ -50,9 +55,15 @@ public class TopicMain {
 		//drop the no use column
 		Dataset<Row> currDataset = csvDataset.drop("polarity","noUse");
 		//new TFIDF(currDataset).buildModel();
-		
+
+		//encode string to index
+		StringIndexer indexer = new StringIndexer()
+				.setInputCol("oldTweetId")
+				.setOutputCol("tweetId");
+		Dataset<Row> indexed = indexer.fit(currDataset).transform(currDataset);
+
 		//set custom javaRDD and compute the mentionMen
-		JavaRDD<tweetInfo> tweetJavaRDD= currDataset.javaRDD().map(new Function<Row, tweetInfo>() {
+		JavaRDD<tweetInfo> tweetJavaRDD= indexed.javaRDD().map(new Function<Row, tweetInfo>() {
 			public tweetInfo call(Row row)throws Exception{
 				tweetInfo tweet = new tweetInfo();
 				tweet.setTweetId(row.getAs("tweetId").toString());
@@ -98,7 +109,8 @@ public class TopicMain {
 		
 		Encoder<tweetInfo> encoder = Encoders.bean(tweetInfo.class);
 		Dataset<tweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
-		
+		ds.show();
+
 		List<Row> mentionDataset = ds.select("userName","tweet","tweetId","mentionMen","userInteraction").collectAsList();
 		//compute mention string 1: 1,1,1;1,2,2;
 		//                       2: 2,1,1;2,2,2;

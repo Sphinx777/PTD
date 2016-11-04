@@ -43,7 +43,11 @@ public class TFIDF implements Serializable{
 	//features: the tfidf value
 	public void buildModel(){
 		Tokenizer tokenizer = new Tokenizer().setInputCol("tweet").setOutputCol("token");
-		Dataset<Row> wordsData = tokenizer.transform(tweetDataset);
+		RegexTokenizer regexTokenizer = new RegexTokenizer().setInputCol("tweet").setOutputCol("token").setPattern("\\W").setMinTokenLength(3);
+		//tokenizer version
+		//Dataset<Row> wordsData = tokenizer.transform(tweetDataset);
+		//regexTokenizer version
+		Dataset<Row> wordsData = regexTokenizer.transform(tweetDataset);
 
 		StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
 		Dataset<Row> filterData = remover.transform(wordsData);
@@ -54,7 +58,7 @@ public class TFIDF implements Serializable{
 //				ArrayList<String> resultList = new ArrayList<String>();
 //				List<String> arrayList = row.getList(3);
 //				for(String str:arrayList){
-//					if(str.length()>3){
+//					if(str.length()>=3){
 //						resultList.add(str);
 //					}
 //				}
@@ -69,7 +73,7 @@ public class TFIDF implements Serializable{
 								  //.setNumFeatures(tweetDataset.collectAsList().size());
 		
 		Dataset<Row> featurizedData = hashingTF.transform(filterData);
-		
+
 		IDF idf = new IDF().setInputCol("rawFeatures").setOutputCol("features");
 		IDFModel idfModel = idf.fit(featurizedData);
 		Dataset<Row> rescaledData = idfModel.transform(featurizedData);
@@ -98,7 +102,7 @@ public class TFIDF implements Serializable{
 			Vector feature = row.getAs("features");
 			for(int i : feature.toSparse().indices()){
 				//System.out.println("i:"+i+":"+feature.toArray()[i]);
-				arrayList.add(new MatrixEntry(Long.valueOf(id),(long)i,feature.toArray()[i]));
+				arrayList.add(new MatrixEntry(Double.valueOf(id).longValue(),(long)i,feature.toArray()[i]));
 			}
 			return arrayList.iterator();
 		});

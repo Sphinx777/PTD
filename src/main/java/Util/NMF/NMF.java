@@ -149,6 +149,7 @@ public class NMF implements Serializable {
 			//System.out.println(H.entries().count());
 			//System.out.println(W.entries().count());
 
+			//compute KL Divergence
 			double tmpKLDivergence = MeasureUtil.getKLDivergence(V,W,H);
 			//System.out.println(tmpKLDivergence);
 			tmpKLDivergenceList.add(tmpKLDivergence);

@@ -16,7 +16,9 @@ public class GetMentionEntry implements FlatMapFunction<String,MatrixEntry>{
 				continue;
 			}
 			String[] splitStrings2 = str.split(TopicConstant.COMMA_DELIMITER);
-			arrayList.add(new MatrixEntry(Long.parseLong(splitStrings2[0]),Long.parseLong(splitStrings2[1]) , Double.parseDouble(splitStrings2[2])));
+
+			arrayList.add(new MatrixEntry(Double.valueOf(splitStrings2[0]).longValue() ,Double.valueOf(splitStrings2[1]).longValue() , Double.parseDouble(splitStrings2[2])));
+			//arrayList.add(new MatrixEntry(Long.parseLong(splitStrings2[0]) ,Long.parseLong(splitStrings2[1]) , Double.parseDouble(splitStrings2[2])));
 			//arrayList.add(splitStrings2[0]+TopicConstant.COMMA_DELIMITER+splitStrings2[1]+TopicConstant.COMMA_DELIMITER+splitStrings2[2]);
 		}
 		return arrayList.iterator();
