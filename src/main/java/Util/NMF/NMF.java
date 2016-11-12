@@ -26,7 +26,7 @@ import java.util.List;
 
 public class NMF implements Serializable {
 	private int numIters = 10;
-	private int numFactors = 5;
+	private int numFactors = 20;
 	private double initialNum = 0.01;
 	private long numRows , numCols;
 	//private DenseMatrix W,H,minW,minH;

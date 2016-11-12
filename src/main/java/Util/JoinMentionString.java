@@ -52,7 +52,10 @@ public class JoinMentionString implements Function<tweetInfo, String>{
 				StringProfile pro2 = ks.getProfile(row.getAs("tweet").toString());
 		        double dbCosValue = pro1.cosineSimilarity(pro2);
 		        dbValue += dbCosValue;
-		        
+
+				//weighted by time-factor
+				dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(),row.getAs("dateString").toString());
+
 		        //passing the sigmoid
 		        dbValue = TopicUtil.calculateSigmoid(dbValue);
 		        arr.add(tweetData.getTweetId()+TopicConstant.COMMA_DELIMITER+row.getAs("tweetId")+TopicConstant.COMMA_DELIMITER+dbValue);

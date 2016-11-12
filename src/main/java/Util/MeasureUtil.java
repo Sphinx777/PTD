@@ -12,11 +12,14 @@ import parquet.org.apache.thrift.TProcessor;
 import topicDerivation.TopicMain;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by user on 2016/10/16.
  */
 public class MeasureUtil {
+    public static HashMap<String,Integer> wordCntMap=new HashMap<String,Integer>();
+
     public static double getKLDivergence(CoordinateMatrix V, CoordinateMatrix W,CoordinateMatrix H){
         final DoubleAccumulator dbAccumulator = TopicMain.sparkSession.sparkContext().doubleAccumulator();
         CoordinateMatrix WH = W.toBlockMatrix().multiply(H.toBlockMatrix()).toCoordinateMatrix();
@@ -57,29 +60,28 @@ public class MeasureUtil {
         return targetMat;
     }
 
-    public static double getTopicCoherenceValue(ArrayList<String> topicWordArray , JavaRDD<String> tweetRDD){
+    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD){
         //parameter : topic word array, RDD tweet
         //return  : dbSum
 
         double dbSum = 0.0;
         int WjCount, WiWjCount;
-        HashMap<String,Integer> hashMap=new HashMap<String,Integer>();
         boolean isWjCounted, isWiWjCounted;
 
         //topic word array:total topic word , reference:the tfidf corpus
         //hashMap key rule:alphabetical
-        for (int i = 2; i <= topicWordArray.size(); i++) {
-            for (int j = 1; j <= i - 1; j++) {
+        for (int i = 1; i < topicWordArray.length; i++) {
+            for (int j = 0; j <= i - 1; j++) {
                 //prevent repeat compute the same word , Wi == Wj
-                if (hashMap.containsKey(topicWordArray.get(j))) {
+                if (wordCntMap.containsKey(topicWordArray[j])) {
                     isWjCounted = true;
                 } else {
                     isWjCounted = false;
                 }
 
                 //prevent repeat compute the same word
-                String hashKey = topicWordArray.get(i).compareTo(topicWordArray.get(j)) >= 0 ? topicWordArray.get(j)+","+topicWordArray.get(i) : topicWordArray.get(i)+","+topicWordArray.get(j);
-                if (hashMap.containsKey(hashKey)) {
+                String hashKey = topicWordArray[i].compareTo(topicWordArray[j]) >= 0 ? topicWordArray[j]+","+topicWordArray[i] : topicWordArray[i]+","+topicWordArray[j];
+                if (wordCntMap.containsKey(hashKey)) {
                     isWiWjCounted = true;
                 } else {
                     isWiWjCounted = false;
@@ -87,9 +89,14 @@ public class MeasureUtil {
 
                 if (isWiWjCounted == false || isWjCounted == false) {
                     //iterate the all tweet(document)
-                    tweetRDD.foreach(new tweetRDD_ForeachFunc(topicWordArray,hashMap,hashKey,i,j,isWjCounted,isWiWjCounted));
+                    tweetRDD.foreach(new tweetRDD_ForeachFunc(topicWordArray,wordCntMap,hashKey,i,j,isWjCounted,isWiWjCounted));
                 }
-                dbSum += Math.log(hashMap.get(hashKey) + 1 / hashMap.get(topicWordArray.get(j)));
+                System.out.println("upper:"+((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1));
+                System.out.println("lower:"+(wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue()) );
+
+                System.out.println("dbSum:"+dbSum);
+                System.out.println("wordCntValue:"+Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue())));
+                dbSum += Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue()));
             }
         }
         return dbSum;
@@ -99,17 +106,17 @@ public class MeasureUtil {
 class tweetRDD_ForeachFunc implements VoidFunction<String>{
     private int idx_i , idx_j;
     private boolean isWjCounted , isWiWjCounted;
-    private ArrayList<String> topicWordArray;
-    private HashMap<String,Integer> wrdCntMap;
+    private String[] topicWordArray;
+    //private HashMap<String,Integer> wrdCntMap;
     private String hashKey;
 
-    public tweetRDD_ForeachFunc(ArrayList<String> input_topicWordArray , HashMap<String,Integer> input_Map , String input_hashKey , int inputIdx_i , int inputIdx_j , boolean input_isWjCounted , boolean input_isWiWjCounted){
+    public tweetRDD_ForeachFunc(String[] input_topicWordArray , HashMap<String,Integer> input_Map , String input_hashKey , int inputIdx_i , int inputIdx_j , boolean input_isWjCounted , boolean input_isWiWjCounted){
         idx_i = inputIdx_i;
         idx_j = inputIdx_j;
         isWjCounted = input_isWjCounted;
         isWiWjCounted = input_isWiWjCounted;
         topicWordArray = input_topicWordArray;
-        wrdCntMap = input_Map;
+//        wrdCntMap = input_Map;
         hashKey = input_hashKey;
     }
 
@@ -117,25 +124,27 @@ class tweetRDD_ForeachFunc implements VoidFunction<String>{
         int WjCount,WiWjCount;
         boolean wjFounded = false;
         if (!isWjCounted || !isWiWjCounted) {
-            wjFounded = Arrays.asList(tweet.split(" ")).contains(topicWordArray.get(idx_j));
+            //wjFounded = Arrays.asList(tweet.split(" ")).stream().map(key -> key.toLowerCase()).collect(Collectors.toList()).contains(topicWordArray[idx_j]);
+            wjFounded = Arrays.asList(tweet.split(" ")).stream().anyMatch(key -> key.toLowerCase().indexOf(topicWordArray[idx_j].toLowerCase())!=-1);
         }
 
         //count Wj
         if (!isWjCounted && wjFounded) {
-            WjCount = wrdCntMap.containsKey(topicWordArray.get(idx_j)) ? wrdCntMap.get(topicWordArray.get(idx_j)) : 0;
-            wrdCntMap.put(topicWordArray.get(idx_j), WjCount + 1);
+            WjCount = MeasureUtil.wordCntMap.containsKey(topicWordArray[idx_j]) ? MeasureUtil.wordCntMap.get(topicWordArray[idx_j]) : 0;
+            MeasureUtil.wordCntMap.put(topicWordArray[idx_j], WjCount + 1);
         }
 
         //count Wi,Wj
         if (!isWiWjCounted) {
-            Boolean wiFounded = Arrays.asList(tweet.split(" ")).contains(topicWordArray.get(idx_i));
+            //Boolean wiFounded = Arrays.asList(tweet.split(" ")).stream().map(key -> key.toLowerCase()).collect(Collectors.toList()).contains(topicWordArray[idx_i]);
+            Boolean wiFounded = Arrays.asList(tweet.split(" ")).stream().anyMatch(key -> key.toLowerCase().indexOf(topicWordArray[idx_i].toLowerCase())!=-1);
             if (wiFounded && wjFounded) {
-                if (wrdCntMap.containsKey(hashKey)) {
-                    WiWjCount = wrdCntMap.get(hashKey);
+                if (MeasureUtil.wordCntMap.containsKey(hashKey)) {
+                    WiWjCount = MeasureUtil.wordCntMap.get(hashKey);
                 } else {
                     WiWjCount = 0;
                 }
-                wrdCntMap.put(hashKey, WiWjCount + 1);
+                MeasureUtil.wordCntMap.put(hashKey, WiWjCount + 1);
             }
         }
     }

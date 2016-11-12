@@ -1,29 +1,27 @@
 package Util;
 
-import jdk.nashorn.internal.runtime.regexp.joni.constants.EncloseType;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.Optional;
-import org.apache.spark.api.java.function.*;
+import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.mllib.linalg.Matrix;
 import org.apache.spark.mllib.linalg.SingularValueDecomposition;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.mllib.linalg.distributed.RowMatrix;
-import org.apache.spark.rdd.RDD;
 import org.apache.spark.sql.Encoders;
-import org.apache.spark.sql.execution.columnar.STRING;
 import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
 import topicDerivation.TopicMain;
 
 import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.function.DoubleBinaryOperator;
-import java.util.stream.Collectors;
-
 
 public class TopicUtil {
 	private static Random r = new Random(System.currentTimeMillis());
@@ -206,5 +204,27 @@ public class TopicUtil {
 
 	public static double getRandomValue(double max) {
 		return dbMinForRandom + (max - dbMinForRandom) * r.nextDouble();
+	}
+
+	public static double getWeightedValue(String strDateTime1 ,String strDateTime2){
+		Date dateTime1=null,dateTime2 = null;
+		try {
+			dateTime1 = new SimpleDateFormat(TopicConstant.DATE_FORMAT,Locale.ENGLISH).parse(strDateTime1);
+			dateTime2 = new SimpleDateFormat(TopicConstant.DATE_FORMAT,Locale.ENGLISH).parse(strDateTime2);
+		} catch (ParseException e) {
+			e.printStackTrace();
+			return 1;
+		}
+
+		Date dateTimeLeast = dateTime1.after(dateTime2)?dateTime1:dateTime2;
+		double dbWeighted=1;
+		long diffT1T2 = Math.abs(dateTime1.getTime() - dateTime2.getTime());
+		long diffT1T2InDays = (long)(diffT1T2 / (24 * 60 * 60 * 1000));
+		long diffTnowLeast = TopicMain.currentTime.getTime() - dateTimeLeast.getTime();
+		long diffTnowLeastInDays = (long)(diffTnowLeast / (24 * 60 * 60 * 1000));
+		if(diffT1T2InDays!=0 || diffTnowLeastInDays!=0) {
+			dbWeighted = 1 + (1.0 / (diffT1T2InDays + diffTnowLeastInDays));
+		}
+		return dbWeighted;
 	}
 }

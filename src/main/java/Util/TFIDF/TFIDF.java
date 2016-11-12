@@ -78,7 +78,7 @@ public class TFIDF implements Serializable{
 		IDFModel idfModel = idf.fit(featurizedData);
 		Dataset<Row> rescaledData = idfModel.transform(featurizedData);
 
-		for(Row row:rescaledData.select("tweetId","words","features","rawFeatures").takeAsList(3)){
+		for(Row row:rescaledData.select("tweetId","words","features","rawFeatures").collectAsList()){
 			Vector feature = row.getAs("features");
 			String id = row.getAs("tweetId");
 			//sparseVector

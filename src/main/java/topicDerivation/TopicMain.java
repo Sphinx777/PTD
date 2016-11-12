@@ -7,6 +7,7 @@ import VO.tweetInfo;
 import au.com.bytecode.opencsv.CSVReader;
 import org.apache.commons.collections.map.LinkedMap;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.math3.filter.MeasurementModel;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -24,14 +25,18 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
+import scala.util.parsing.combinator.testing.Str;
+
 import java.io.StringReader;
 import java.util.*;
 
 public class TopicMain {
 	public static SparkSession  sparkSession;
+	public static Date currentTime = new Date();
 	static Logger logger = Logger.getLogger(TopicMain.class.getName());
 
 	public static void main(String[] args) {
@@ -111,7 +116,7 @@ public class TopicMain {
 		Dataset<tweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
 		ds.show();
 
-		List<Row> mentionDataset = ds.select("userName","tweet","tweetId","mentionMen","userInteraction").collectAsList();
+		List<Row> mentionDataset = ds.select("userName","dateString","tweet","tweetId","mentionMen","userInteraction").collectAsList();
 		//compute mention string 1: 1,1,1;1,2,2;
 		//                       2: 2,1,1;2,2,2;
 		JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset));
@@ -232,9 +237,24 @@ public class TopicMain {
 		});
 
 		System.out.println(cmpRDD.count());
-		JavaRDD<String> test = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap()));
-		System.out.println(test.count());
-		test.saveAsTextFile(outFilePath);
+		JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap()));
+		System.out.println(jsonRDD.count());
+		jsonRDD.saveAsTextFile(outFilePath);
+
+		//get the topic coherence value
+		List<String[]> topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap())).collect();
+		JavaRDD<String> tweetStrRDD = tweetJavaRDD.map(new Function<tweetInfo, String>() {
+			@Override
+			public String call(tweetInfo v1) throws Exception {
+				return v1.getTweet();
+			}
+		});
+		DoubleAccumulator dbAccumulator = TopicMain.sparkSession.sparkContext().doubleAccumulator();
+
+		for(String[] strings:topicWordList){
+			dbAccumulator.add(MeasureUtil.getTopicCoherenceValue(strings,tweetStrRDD));
+		}
+		System.out.println("Topic coherence value:"+dbAccumulator.value() / (double)topicWordList.size());
 		//Object vs = poMatrix.toRowMatrix().rows().take(1);
 		//Encoders.STRING()
 		//Dataset<Vector> dss = sparkSession.createDataset(rdd.rdd(), Encoders.bean(Double.class));
