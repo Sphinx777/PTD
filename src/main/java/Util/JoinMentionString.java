@@ -1,6 +1,6 @@
-package Util;
+package util;
 
-import VO.tweetInfo;
+import vo.TweetInfo;
 import info.debatty.java.stringsimilarity.KShingling;
 import info.debatty.java.stringsimilarity.StringProfile;
 import org.apache.spark.api.java.function.Function;
@@ -9,7 +9,7 @@ import org.apache.spark.sql.Row;
 import java.util.ArrayList;
 import java.util.List;
 
-public class JoinMentionString implements Function<tweetInfo, String>{
+public class JoinMentionString implements Function<TweetInfo, String>{
 	List<Row> tmpMentionList;
 	//Word2Vec word2Vec;
 	
@@ -18,7 +18,7 @@ public class JoinMentionString implements Function<tweetInfo, String>{
 		//word2Vec = new Word2Vec.Builder().build();
 	}
 	
-	public String call(tweetInfo tweetData) throws Exception{
+	public String call(TweetInfo tweetData) throws Exception{
 		final String splitStrings=tweetData.getUserName();
 		final List<String> arr = new ArrayList<String>();
 		String tmpString;

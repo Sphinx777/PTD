@@ -1,8 +1,7 @@
-package Util.TFIDF;
+package util.tfidf;
 
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
-import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.ml.feature.*;
 import org.apache.spark.ml.linalg.Vector;
@@ -10,16 +9,9 @@ import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.RowFactory;
-import org.apache.spark.sql.execution.columnar.COMPACT_DECIMAL;
-import org.apache.spark.sql.execution.columnar.STRING;
-import org.apache.spark.sql.execution.streaming.state.KeyRemoved;
-import scala.collection.mutable.WrappedArray;
-import topicDerivation.TopicMain;
 
 import java.io.Serializable;
 import java.util.*;
-import java.util.stream.Stream;
 
 public class TFIDF implements Serializable{
 	private int numFeatures = 100;

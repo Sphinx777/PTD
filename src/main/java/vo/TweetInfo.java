@@ -1,6 +1,8 @@
-package VO;
+package vo;
 
-public class tweetInfo {
+import java.io.Serializable;
+
+public class TweetInfo implements Serializable{
 	private String tweetId;
 	public String getTweetId() {
 		return tweetId;

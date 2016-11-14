@@ -1,7 +1,5 @@
-package Util;
+package util;
 
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.spark.api.java.function.Function;
 import org.codehaus.jackson.map.ObjectMapper;
 

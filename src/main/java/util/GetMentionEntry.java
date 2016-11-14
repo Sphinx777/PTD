@@ -1,4 +1,4 @@
-package Util;
+package util;
 
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;

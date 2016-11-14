@@ -1,25 +1,19 @@
-package Util.NMF;
+package util.nmf;
 
-import Util.MeasureUtil;
-import Util.TopicConstant;
-import Util.TopicUtil;
-import org.apache.commons.lang.SerializationUtils;
+import util.MeasureUtil;
+import util.TopicConstant;
+import util.TopicUtil;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
-import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
-import org.apache.spark.mllib.linalg.DenseMatrix;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Encoders;
-import org.apache.spark.sql.catalyst.expressions.SoundEx;
 import org.apache.spark.util.LongAccumulator;
-import org.omg.CosNaming.IstringHelper;
 import topicDerivation.TopicMain;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;

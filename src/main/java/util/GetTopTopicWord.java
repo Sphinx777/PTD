@@ -1,8 +1,6 @@
-package Util;
+package util;
 
 import org.apache.spark.api.java.function.Function;
-import org.codehaus.jackson.map.ObjectMapper;
-import scala.util.parsing.combinator.testing.Str;
 
 import java.util.*;
 

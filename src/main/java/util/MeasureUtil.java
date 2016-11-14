@@ -1,18 +1,14 @@
-package Util;
+package util;
 
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.VoidFunction;
-import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
-import org.apache.spark.sql.execution.columnar.STRING;
 import org.apache.spark.util.DoubleAccumulator;
-import parquet.org.apache.thrift.TProcessor;
 import topicDerivation.TopicMain;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Created by user on 2016/10/16.

@@ -1,4 +1,4 @@
-package Util;
+package util;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.spark.api.java.JavaPairRDD;

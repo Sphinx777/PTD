@@ -1,17 +1,11 @@
 package topicDerivation;
 
-import Util.*;
-import Util.NMF.NMF;
-import Util.TFIDF.TFIDF;
-import VO.tweetInfo;
+import util.*;
+import util.nmf.NMF;
+import util.tfidf.TFIDF;
+import vo.TweetInfo;
 import au.com.bytecode.opencsv.CSVReader;
-import org.apache.commons.collections.map.LinkedMap;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.math3.filter.MeasurementModel;
-import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.ml.feature.StringIndexer;
@@ -19,17 +13,12 @@ import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.*;
-import org.apache.spark.sql.execution.columnar.DOUBLE;
-import org.apache.spark.sql.execution.columnar.STRING;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.util.DoubleAccumulator;
-import org.apache.spark.util.LongAccumulator;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
-import scala.util.parsing.combinator.testing.Str;
 
 import java.io.StringReader;
 import java.util.*;
@@ -56,10 +45,10 @@ public class TopicMain {
 		Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(args[0]);
 
 		String outFilePath = args[1];
-
+		double maxCoherenceValue=-Double.MAX_VALUE;
 		//drop the no use column
 		Dataset<Row> currDataset = csvDataset.drop("polarity","noUse");
-		//new TFIDF(currDataset).buildModel();
+		//new tfidf(currDataset).buildModel();
 
 		//encode string to index
 		StringIndexer indexer = new StringIndexer()
@@ -68,9 +57,9 @@ public class TopicMain {
 		Dataset<Row> indexed = indexer.fit(currDataset).transform(currDataset);
 
 		//set custom javaRDD and compute the mentionMen
-		JavaRDD<tweetInfo> tweetJavaRDD= indexed.javaRDD().map(new Function<Row, tweetInfo>() {
-			public tweetInfo call(Row row)throws Exception{
-				tweetInfo tweet = new tweetInfo();
+		JavaRDD<TweetInfo> tweetJavaRDD= indexed.javaRDD().map(new Function<Row, TweetInfo>() {
+			public TweetInfo call(Row row)throws Exception{
+				TweetInfo tweet = new TweetInfo();
 				tweet.setTweetId(row.getAs("tweetId").toString());
 				tweet.setDateString(row.getAs("date").toString());
 				tweet.setUserName(row.getAs("userName").toString());
@@ -112,8 +101,8 @@ public class TopicMain {
 			}
 		});
 		
-		Encoder<tweetInfo> encoder = Encoders.bean(tweetInfo.class);
-		Dataset<tweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
+		Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
+		Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
 		ds.show();
 
 		List<Row> mentionDataset = ds.select("userName","dateString","tweet","tweetId","mentionMen","userInteraction").collectAsList();
@@ -154,7 +143,7 @@ public class TopicMain {
 //			}
 //		});
 //		CoordinateMatrix interactionMatrix = new CoordinateMatrix(poMatrixTest.rdd());
-//		NMF interactionNMF = new NMF(interactionMatrix,true);
+//		nmf interactionNMF = new nmf(interactionMatrix,true);
 //		interactionNMF.buildNMFModel();
 
 		//System.out.println(poMatrix.count());
@@ -188,7 +177,7 @@ public class TopicMain {
 		});
 		Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset,schemaTFIDF);
 
-		//TFIDF
+		//tfidf
 		TFIDF tfidf = new TFIDF(sentenceData);
 		tfidf.buildModel();
 		NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(),false);
@@ -243,18 +232,24 @@ public class TopicMain {
 
 		//get the topic coherence value
 		List<String[]> topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap())).collect();
-		JavaRDD<String> tweetStrRDD = tweetJavaRDD.map(new Function<tweetInfo, String>() {
+		JavaRDD<String> tweetStrRDD = tweetJavaRDD.map(new Function<TweetInfo, String>() {
 			@Override
-			public String call(tweetInfo v1) throws Exception {
+			public String call(TweetInfo v1) throws Exception {
 				return v1.getTweet();
 			}
 		});
 		DoubleAccumulator dbAccumulator = TopicMain.sparkSession.sparkContext().doubleAccumulator();
 
+		double tmpCoherenceValue;
 		for(String[] strings:topicWordList){
-			dbAccumulator.add(MeasureUtil.getTopicCoherenceValue(strings,tweetStrRDD));
+			tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings,tweetStrRDD);
+			if(Double.compare(tmpCoherenceValue,maxCoherenceValue)>0){
+				maxCoherenceValue = tmpCoherenceValue;
+			}
+			dbAccumulator.add(tmpCoherenceValue);
 		}
-		System.out.println("Topic coherence value:"+dbAccumulator.value() / (double)topicWordList.size());
+		System.out.println("Max Topic coherence value:"+maxCoherenceValue);
+		System.out.println("Average topic coherence value:"+dbAccumulator.value()/(double)topicWordList.size());
 		//Object vs = poMatrix.toRowMatrix().rows().take(1);
 		//Encoders.STRING()
 		//Dataset<Vector> dss = sparkSession.createDataset(rdd.rdd(), Encoders.bean(Double.class));
