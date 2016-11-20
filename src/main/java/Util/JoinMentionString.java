@@ -1,5 +1,6 @@
 package util;
 
+import org.apache.spark.broadcast.Broadcast;
 import vo.TweetInfo;
 import info.debatty.java.stringsimilarity.KShingling;
 import info.debatty.java.stringsimilarity.StringProfile;
@@ -7,14 +8,18 @@ import org.apache.spark.api.java.function.Function;
 import org.apache.spark.sql.Row;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class JoinMentionString implements Function<TweetInfo, String>{
 	List<Row> tmpMentionList;
+	Date currDate;
+
 	//Word2Vec word2Vec;
 	
-	public JoinMentionString(List<Row> strings){
+	public JoinMentionString(List<Row> strings , Date paraCurrDate){
 		tmpMentionList = strings;
+		currDate = paraCurrDate;
 		//word2Vec = new Word2Vec.Builder().build();
 	}
 	
@@ -54,7 +59,7 @@ public class JoinMentionString implements Function<TweetInfo, String>{
 		        dbValue += dbCosValue;
 
 				//weighted by time-factor
-				dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(),row.getAs("dateString").toString());
+				dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(),row.getAs("dateString").toString(),currDate);
 
 		        //passing the sigmoid
 		        dbValue = TopicUtil.calculateSigmoid(dbValue);

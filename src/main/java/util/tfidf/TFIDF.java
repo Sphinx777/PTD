@@ -9,12 +9,12 @@ import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import util.TopicConstant;
 
 import java.io.Serializable;
 import java.util.*;
 
 public class TFIDF implements Serializable{
-	private int numFeatures = 100;
 	private Dataset<Row> tweetDataset;
 	private Dataset<Row> tfidfDataSet;
 	private CoordinateMatrix CoorMatOfTFIDF;
@@ -61,7 +61,7 @@ public class TFIDF implements Serializable{
 		HashingTF hashingTF = new HashingTF()
 								  .setInputCol("words")
 								  .setOutputCol("rawFeatures")
-								  .setNumFeatures(numFeatures);
+								  .setNumFeatures(TopicConstant.numFeatures);
 								  //.setNumFeatures(tweetDataset.collectAsList().size());
 		
 		Dataset<Row> featurizedData = hashingTF.transform(filterData);
@@ -112,12 +112,12 @@ public class TFIDF implements Serializable{
 //		});
 
 		CoorMatOfTFIDF = new CoordinateMatrix(entryJavaRDD.rdd());
-		CoorMatOfTFIDF.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
-			@Override
-			public void call(MatrixEntry matrixEntry) throws Exception {
-				System.out.println(matrixEntry.i()+","+matrixEntry.j()+":"+matrixEntry.value());
-			}
-		});
+//		CoorMatOfTFIDF.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
+//			@Override
+//			public void call(MatrixEntry matrixEntry) throws Exception {
+//				System.out.println(matrixEntry.i()+","+matrixEntry.j()+":"+matrixEntry.value());
+//			}
+//		});
 		System.out.println(CoorMatOfTFIDF.entries().count());
 	}
 	//x:tweet Id , y:term id(features--vector) , value:tfidf(features--vector)

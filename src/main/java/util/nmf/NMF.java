@@ -1,5 +1,6 @@
 package util.nmf;
 
+import org.apache.spark.sql.SparkSession;
 import util.MeasureUtil;
 import util.TopicConstant;
 import util.TopicUtil;
@@ -19,8 +20,8 @@ import java.util.Iterator;
 import java.util.List;
 
 public class NMF implements Serializable {
-	private int numIters = 10;
-	private int numFactors = 20;
+	private int numIters;
+	private int numFactors;
 	private double initialNum = 0.01;
 	private long numRows , numCols;
 	//private DenseMatrix W,H,minW,minH;
@@ -28,17 +29,21 @@ public class NMF implements Serializable {
 	//static double tmpKLDivergence = 0.0;
     static double minKLDivergence = Double.MAX_VALUE;
 	private boolean boolUpdateW;
+	private SparkSession sparkSession;
 
-	public NMF(CoordinateMatrix matV,boolean isUpdateW) {
+	public NMF(CoordinateMatrix matV,boolean isUpdateW,SparkSession paraSparkSession,int paraIters,int paraFactors) {
 		V = matV;
 		boolUpdateW = isUpdateW;
 		minKLDivergence = Double.MAX_VALUE;
+		numIters = paraIters;
+		numFactors = paraFactors;
 		//initialize to zero or other method
 		//double[] dbArray =new double[(int)(V.numRows() * numFactors)];
         //Arrays.fill(dbArray,0.01);
-		final LongAccumulator rowAccumulator = TopicMain.sparkSession.sparkContext().longAccumulator();
-		final LongAccumulator colAccumulator = TopicMain.sparkSession.sparkContext().longAccumulator();
-		final LongAccumulator factorAccumulator = TopicMain.sparkSession.sparkContext().longAccumulator();
+		this.sparkSession = paraSparkSession;
+		final LongAccumulator rowAccumulator = sparkSession.sparkContext().longAccumulator();
+		final LongAccumulator colAccumulator = sparkSession.sparkContext().longAccumulator();
+		final LongAccumulator factorAccumulator = sparkSession.sparkContext().longAccumulator();
 		numRows = V.numRows();
 		numCols = V.numCols();
 		List<Double> tmpDBList= new ArrayList<Double>();
@@ -47,7 +52,7 @@ public class NMF implements Serializable {
 			tmpDBList.add(initialNum);
 		}
 
-		JavaRDD<Double> tmpWRDD = TopicMain.sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
+		JavaRDD<Double> tmpWRDD = sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
 		JavaRDD<MatrixEntry> tmpWEntryRDD = tmpWRDD.flatMap(new FlatMapFunction<Double, MatrixEntry>() {
 			@Override
 			public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
@@ -81,7 +86,7 @@ public class NMF implements Serializable {
 			tmpDBList.add(initialNum);
 		}
 
-		JavaRDD<Double> tmpHRDD = TopicMain.sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
+		JavaRDD<Double> tmpHRDD = sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
 		JavaRDD<MatrixEntry> tmpHEntryRDD = tmpWRDD.flatMap(new FlatMapFunction<Double, MatrixEntry>() {
 			@Override
 			public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
@@ -144,7 +149,7 @@ public class NMF implements Serializable {
 			//System.out.println(W.entries().count());
 
 			//compute KL Divergence
-			double tmpKLDivergence = MeasureUtil.getKLDivergence(V,W,H);
+			double tmpKLDivergence = MeasureUtil.getKLDivergence(V,W,H,sparkSession);
 			//System.out.println(tmpKLDivergence);
 			tmpKLDivergenceList.add(tmpKLDivergence);
 			if(tmpKLDivergence<minKLDivergence){

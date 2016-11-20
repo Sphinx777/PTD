@@ -3,8 +3,10 @@ package util;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.VoidFunction;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.DoubleAccumulator;
 import topicDerivation.TopicMain;
 
@@ -14,10 +16,10 @@ import java.util.*;
  * Created by user on 2016/10/16.
  */
 public class MeasureUtil {
-    public static HashMap<String,Integer> wordCntMap=new HashMap<String,Integer>();
+    //public static HashMap<String,Integer> wordCntMap=new HashMap<String,Integer>();
 
-    public static double getKLDivergence(CoordinateMatrix V, CoordinateMatrix W,CoordinateMatrix H){
-        final DoubleAccumulator dbAccumulator = TopicMain.sparkSession.sparkContext().doubleAccumulator();
+    public static double getKLDivergence(CoordinateMatrix V, CoordinateMatrix W, CoordinateMatrix H, SparkSession sparkSession){
+        final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
         CoordinateMatrix WH = W.toBlockMatrix().multiply(H.toBlockMatrix()).toCoordinateMatrix();
         CoordinateMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,V,WH);
         CoordinateMatrix logResult = getMatrixLogValue(loginSide);
@@ -56,13 +58,14 @@ public class MeasureUtil {
         return targetMat;
     }
 
-    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD){
+    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD , Broadcast<HashMap<String,Integer>> brWordCntMap){
         //parameter : topic word array, RDD tweet
         //return  : dbSum
 
         double dbSum = 0.0;
         int WjCount, WiWjCount;
         boolean isWjCounted, isWiWjCounted;
+        HashMap<String,Integer> wordCntMap=brWordCntMap.getValue();
 
         //topic word array:total topic word , reference:the tfidf corpus
         //hashMap key rule:alphabetical
@@ -85,7 +88,7 @@ public class MeasureUtil {
 
                 if (isWiWjCounted == false || isWjCounted == false) {
                     //iterate the all tweet(document)
-                    tweetRDD.foreach(new tweetRDD_ForeachFunc(topicWordArray,wordCntMap,hashKey,i,j,isWjCounted,isWiWjCounted));
+                    tweetRDD.foreach(new tweetRDD_ForeachFunc(topicWordArray,brWordCntMap,hashKey,i,j,isWjCounted,isWiWjCounted));
                 }
                 System.out.println("upper:"+((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1));
                 System.out.println("lower:"+(wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue()) );
@@ -103,16 +106,16 @@ class tweetRDD_ForeachFunc implements VoidFunction<String>{
     private int idx_i , idx_j;
     private boolean isWjCounted , isWiWjCounted;
     private String[] topicWordArray;
-    //private HashMap<String,Integer> wrdCntMap;
+    private Broadcast<HashMap<String,Integer>> wrdCntMap;
     private String hashKey;
 
-    public tweetRDD_ForeachFunc(String[] input_topicWordArray , HashMap<String,Integer> input_Map , String input_hashKey , int inputIdx_i , int inputIdx_j , boolean input_isWjCounted , boolean input_isWiWjCounted){
+    public tweetRDD_ForeachFunc(String[] input_topicWordArray , Broadcast<HashMap<String,Integer>> input_Map , String input_hashKey , int inputIdx_i , int inputIdx_j , boolean input_isWjCounted , boolean input_isWiWjCounted){
         idx_i = inputIdx_i;
         idx_j = inputIdx_j;
         isWjCounted = input_isWjCounted;
         isWiWjCounted = input_isWiWjCounted;
         topicWordArray = input_topicWordArray;
-//        wrdCntMap = input_Map;
+        wrdCntMap = input_Map;
         hashKey = input_hashKey;
     }
 
@@ -126,8 +129,8 @@ class tweetRDD_ForeachFunc implements VoidFunction<String>{
 
         //count Wj
         if (!isWjCounted && wjFounded) {
-            WjCount = MeasureUtil.wordCntMap.containsKey(topicWordArray[idx_j]) ? MeasureUtil.wordCntMap.get(topicWordArray[idx_j]) : 0;
-            MeasureUtil.wordCntMap.put(topicWordArray[idx_j], WjCount + 1);
+            WjCount = wrdCntMap.getValue().containsKey(topicWordArray[idx_j]) ? wrdCntMap.getValue().get(topicWordArray[idx_j]) : 0;
+            wrdCntMap.getValue().put(topicWordArray[idx_j], WjCount + 1);
         }
 
         //count Wi,Wj
@@ -135,12 +138,12 @@ class tweetRDD_ForeachFunc implements VoidFunction<String>{
             //Boolean wiFounded = Arrays.asList(tweet.split(" ")).stream().map(key -> key.toLowerCase()).collect(Collectors.toList()).contains(topicWordArray[idx_i]);
             Boolean wiFounded = Arrays.asList(tweet.split(" ")).stream().anyMatch(key -> key.toLowerCase().indexOf(topicWordArray[idx_i].toLowerCase())!=-1);
             if (wiFounded && wjFounded) {
-                if (MeasureUtil.wordCntMap.containsKey(hashKey)) {
-                    WiWjCount = MeasureUtil.wordCntMap.get(hashKey);
+                if (wrdCntMap.getValue().containsKey(hashKey)) {
+                    WiWjCount = wrdCntMap.getValue().get(hashKey);
                 } else {
                     WiWjCount = 0;
                 }
-                MeasureUtil.wordCntMap.put(hashKey, WiWjCount + 1);
+                wrdCntMap.getValue().put(hashKey, WiWjCount + 1);
             }
         }
     }
