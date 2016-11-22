@@ -352,7 +352,7 @@ instanceKlass scala/Product6
 instanceKlass org/apache/spark/package$SparkBuildInfo$
 instanceKlass org/apache/spark/package$
 instanceKlass java/util/concurrent/ConcurrentHashMap$Traverser
-instanceKlass org/slf4j/helpers/Util
+instanceKlass org/slf4j/helpers/util
 instanceKlass org/slf4j/helpers/NOPLoggerFactory
 instanceKlass org/slf4j/helpers/SubstituteLoggerFactory
 instanceKlass org/slf4j/LoggerFactory

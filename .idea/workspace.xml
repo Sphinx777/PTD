@@ -1,11 +1,70 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="79d15bd6-8428-4ec7-8c24-56391b8c81a3" name="Default" comment="" />
+    <list default="true" id="79d15bd6-8428-4ec7-8c24-56391b8c81a3" name="Default" comment="Add the stringIndexer">
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/target/classes/Util/GetMentionEntryReverse.class" afterPath="" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/out/production/main/result/.part-00000.crc" afterPath="$PROJECT_DIR$/out/production/main/result/.part-00000.crc" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/GetMentionEntry.class" afterPath="$PROJECT_DIR$/target/classes/Util/GetMentionEntry.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/JoinMentionString.class" afterPath="$PROJECT_DIR$/target/classes/Util/JoinMentionString.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/MeasureUtil$1.class" afterPath="$PROJECT_DIR$/target/classes/Util/MeasureUtil$1.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/MeasureUtil$2.class" afterPath="$PROJECT_DIR$/target/classes/Util/MeasureUtil$2.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/MeasureUtil.class" afterPath="$PROJECT_DIR$/target/classes/Util/MeasureUtil.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$1.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$1.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$2.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$2.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$3.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$3.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$4.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$4.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$5.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$5.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$6.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$6.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$7.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$7.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$8.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF$8.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/NMF/NMF.class" afterPath="$PROJECT_DIR$/target/classes/Util/NMF/NMF.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TFIDF/TFIDF$1.class" afterPath="$PROJECT_DIR$/target/classes/Util/TFIDF/TFIDF$1.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TFIDF/TFIDF.class" afterPath="$PROJECT_DIR$/target/classes/Util/TFIDF/TFIDF.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicConstant$MatrixOperation.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicConstant$MatrixOperation.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicConstant.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicConstant.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil$1.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil$1.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil$2.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil$2.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil$3.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil$3.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil$4.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil$4.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil$5.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil$5.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil$6.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil$6.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil$7.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil$7.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/TopicUtil.class" afterPath="$PROJECT_DIR$/target/classes/Util/TopicUtil.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/Util/WriteToJSON.class" afterPath="$PROJECT_DIR$/target/classes/Util/WriteToJSON.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/VO/tweetInfo.class" afterPath="$PROJECT_DIR$/target/classes/VO/tweetInfo.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$1.class" afterPath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$1.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$2.class" afterPath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$2.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$3$1.class" afterPath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$3$1.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$3.class" afterPath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$3.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$ParseLine.class" afterPath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain$ParseLine.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain.class" afterPath="$PROJECT_DIR$/target/classes/topicDerivation/TopicMain.class" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/app.iml" afterPath="$PROJECT_DIR$/app.iml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/out/production/main/result/part-00000" afterPath="$PROJECT_DIR$/out/production/main/result/part-00000" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/replay_pid4016.log" afterPath="$PROJECT_DIR$/replay_pid4016.log" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java" afterPath="$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java" afterPath="$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java" afterPath="$PROJECT_DIR$/src/main/java/util/GetMentionEntry.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/GetTopTopicWord.java" afterPath="$PROJECT_DIR$/src/main/java/util/GetTopTopicWord.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/MeasureUtil.java" afterPath="$PROJECT_DIR$/src/main/java/util/MeasureUtil.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java" afterPath="$PROJECT_DIR$/src/main/java/util/nmf/NMF.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java" afterPath="$PROJECT_DIR$/src/main/java/util/tfidf/TFIDF.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/TopicConstant.java" afterPath="$PROJECT_DIR$/src/main/java/util/TopicConstant.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/TopicUtil.java" afterPath="$PROJECT_DIR$/src/main/java/util/TopicUtil.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/Util/WriteToJSON.java" afterPath="$PROJECT_DIR$/src/main/java/util/WriteToJSON.java" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/src/main/java/VO/tweetInfo.java" afterPath="$PROJECT_DIR$/src/main/java/vo/TweetInfo.java" />
+    </list>
     <ignored path="app.iws" />
     <ignored path=".idea/workspace.xml" />
     <ignored path="$PROJECT_DIR$/out/" />
     <ignored path="$PROJECT_DIR$/target/" />
+    <ignored path=".idea/" />
+    <ignored path=".settings/" />
+    <ignored path="spark-warehouse/" />
+    <ignored path="app.iml" />
+    <ignored path="hs_err_pid4016.log" />
+    <ignored path="replay_pid4016.log" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -31,73 +90,28 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="375">
-      <file leaf-file-name="TopicMain.java" pinned="false" current-in-tab="false">
+      <file leaf-file-name="TopicMain.java" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="125">
-              <caret line="177" column="8" selection-start-line="177" selection-start-column="8" selection-end-line="177" selection-end-column="8" />
+            <state relative-caret-position="384">
+              <caret line="112" column="19" selection-start-line="112" selection-start-column="19" selection-end-line="112" selection-end-column="19" />
               <folding>
                 <element signature="imports" expanded="true" />
-                <marker date="1477134298731" expanded="true" signature="4602:4610" ph="&lt;~&gt;" />
-                <marker date="1477134298731" expanded="true" signature="4986:4999" ph="&lt;~&gt;" />
+                <marker date="1479136724194" expanded="true" signature="4791:4799" ph="&lt;~&gt;" />
+                <marker date="1479136724194" expanded="true" signature="5175:5188" ph="&lt;~&gt;" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="WriteToJSON.java" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/java/Util/WriteToJSON.java">
+      <file leaf-file-name="TweetInfo.java" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/java/vo/TweetInfo.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="600">
-              <caret line="31" column="0" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
+            <state relative-caret-position="100">
+              <caret line="4" column="46" selection-start-line="4" selection-start-column="46" selection-end-line="4" selection-end-column="46" />
               <folding>
-                <element signature="imports" expanded="false" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="TFIDF.java" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="262">
-              <caret line="71" column="8" selection-start-line="71" selection-start-column="8" selection-end-line="71" selection-end-column="8" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="JoinMentionString.java" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="400">
-              <caret line="23" column="25" selection-start-line="23" selection-start-column="25" selection-end-line="23" selection-end-column="25" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="NMF.java" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="234">
-              <caret line="158" column="25" selection-start-line="158" selection-start-column="25" selection-end-line="158" selection-end-column="25" />
-              <folding>
-                <element signature="imports" expanded="true" />
-                <element signature="e#5177#5185#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="TopicUtil.java" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="598">
-              <caret line="206" column="25" selection-start-line="206" selection-start-column="25" selection-end-line="206" selection-end-column="25" />
-              <folding>
-                <element signature="e#8224#8225#0" expanded="true" />
-                <element signature="e#8294#8295#0" expanded="true" />
+                <element signature="e#532#533#0" expanded="true" />
+                <element signature="e#551#552#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -112,6 +126,9 @@
       </list>
     </option>
   </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
   <component name="GradleLocalSettings">
     <option name="externalProjectsViewState">
       <projects_view />
@@ -121,15 +138,19 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$MAVEN_REPOSITORY$/org/apache/spark/spark-core_2.10/2.0.0/spark-core_2.10-2.0.0.jar!/org/apache/spark/api/java/JavaRDDLike.class" />
+        <option value="$PROJECT_DIR$/pom.xml" />
+        <option value="$PROJECT_DIR$/log4j.properties" />
+        <option value="$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java" />
         <option value="$PROJECT_DIR$/src/main/java/Util/TopicConstant.java" />
+        <option value="$PROJECT_DIR$/src/main/java/Util/TopicUtil.java" />
+        <option value="$PROJECT_DIR$/src/main/java/Util/WriteToJSON.java" />
+        <option value="$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java" />
+        <option value="$PROJECT_DIR$/src/main/java/Util/GetTopTopicWord.java" />
         <option value="$PROJECT_DIR$/src/main/java/Util/MeasureUtil.java" />
         <option value="$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java" />
-        <option value="$PROJECT_DIR$/pom.xml" />
-        <option value="$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java" />
-        <option value="$PROJECT_DIR$/src/main/java/Util/WriteToJSON.java" />
-        <option value="$PROJECT_DIR$/src/main/java/Util/TopicUtil.java" />
-        <option value="$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java" />
         <option value="$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java" />
+        <option value="$PROJECT_DIR$/src/main/java/vo/TweetInfo.java" />
+        <option value="$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java" />
       </list>
     </option>
   </component>
@@ -202,20 +223,144 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="PackagesPane" />
-      <pane id="ProjectPane">
-        <subPane />
-      </pane>
+      <pane id="Scope" />
       <pane id="Scratches" />
+      <pane id="ProjectPane">
+        <subPane>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="main" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="main" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="java" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="vo" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="main" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="java" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="util" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="app" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="main" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="java" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+        </subPane>
+      </pane>
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="settings.editor.selected.configurable" value="reference.projectsettings.compiler.javacompiler" />
+    <property name="settings.editor.selected.configurable" value="settings.github" />
     <property name="settings.editor.splitter.proportion" value="0.2" />
-    <property name="project.structure.last.edited" value="Global Libraries" />
+    <property name="project.structure.last.edited" value="Project" />
     <property name="project.structure.proportion" value="0.15" />
     <property name="project.structure.side.proportion" value="0.2" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/replay_pid4016.log" />
   </component>
   <component name="RunManager" selected="Application.TopicMain">
     <configuration default="false" name="TopicMain" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
@@ -495,7 +640,7 @@
     <option name="remove_strategy" value="false" />
   </component>
   <component name="SvnConfiguration">
-    <configuration />
+    <configuration>C:\Users\user\AppData\Roaming\Subversion</configuration>
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -505,6 +650,21 @@
       <option name="presentableId" value="Default" />
       <updated>1476000554990</updated>
     </task>
+    <task id="LOCAL-00001" summary="Add the stringIndexer">
+      <created>1478236986937</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1478236986937</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Add topic coherence measure function">
+      <created>1478967431467</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1478967431467</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TodoView">
@@ -525,33 +685,33 @@
       <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.34541336" sideWeight="0.49678457" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Palette&#9;" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Analysis" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.41109854" sideWeight="0.50589496" order="1" side_tool="true" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4297052" sideWeight="0.50860214" order="1" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3290461" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.045300115" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3295583" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.5979615" sideWeight="0.49303323" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32842582" sideWeight="0.49785408" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Tool" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.19935691" sideWeight="0.5" order="4" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.1982851" sideWeight="0.5" order="4" side_tool="false" content_ui="combo" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3295583" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.24895833" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="UI Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.42921856" sideWeight="0.49410504" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.42921856" sideWeight="0.49139786" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.329582" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
-      <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="6" side_tool="false" content_ui="combo" />
+      <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="7" side_tool="false" content_ui="combo" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
-      <window_info id="Coverage" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3299356" sideWeight="0.5" order="4" side_tool="true" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3295583" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="Coverage" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3299356" sideWeight="0.5" order="5" side_tool="true" content_ui="tabs" />
     </layout>
     <layout-to-restore>
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.41109854" sideWeight="0.50589496" order="1" side_tool="true" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.7168743" sideWeight="0.50696677" order="1" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3290461" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Tool" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
@@ -565,14 +725,32 @@
       <window_info id="Palette&#9;" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Analysis" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.045300115" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3295583" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.5979615" sideWeight="0.49303323" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Coverage" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3299356" sideWeight="0.5" order="5" side_tool="true" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32842582" sideWeight="0.49785408" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.19935691" sideWeight="0.5" order="4" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.19892474" sideWeight="0.5" order="4" side_tool="false" content_ui="combo" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3295583" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.329582" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
     </layout-to-restore>
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="RECENTLY_FILTERED_USER_GROUPS">
+                <collection />
+              </option>
+              <option name="RECENTLY_FILTERED_BRANCH_GROUPS">
+                <collection />
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="Vcs.Log.UiProperties">
     <option name="RECENTLY_FILTERED_USER_GROUPS">
@@ -585,52 +763,45 @@
   <component name="VcsContentAnnotationSettings">
     <option name="myLimit" value="2678400000" />
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Add the stringIndexer" />
+    <MESSAGE value="Add topic coherence measure function" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add topic coherence measure function" />
+  </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java</url>
+          <url>file://$PROJECT_DIR$/src/main/java/util/nmf/NMF.java</url>
           <properties />
           <option name="timeStamp" value="100" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java</url>
-          <line>154</line>
+          <url>file://$PROJECT_DIR$/src/main/java/util/TopicUtil.java</url>
+          <line>152</line>
           <properties />
           <option name="timeStamp" value="144" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java</url>
-          <line>152</line>
+          <url>file://$PROJECT_DIR$/src/main/java/util/TopicUtil.java</url>
+          <line>150</line>
           <properties />
           <option name="timeStamp" value="147" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
           <url>file://$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java</url>
-          <line>222</line>
-          <properties />
-          <option name="timeStamp" value="232" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java</url>
-          <line>174</line>
-          <properties />
-          <option name="timeStamp" value="309" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java</url>
-          <line>139</line>
+          <line>145</line>
           <properties />
           <option name="timeStamp" value="313" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="java-line">
-          <url>file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java</url>
-          <line>154</line>
+          <url>file://$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java</url>
+          <line>107</line>
           <properties />
-          <option name="timeStamp" value="314" />
+          <option name="timeStamp" value="406" />
         </line-breakpoint>
       </breakpoints>
-      <option name="time" value="315" />
+      <option name="time" value="407" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="Application">
@@ -643,14 +814,7 @@
     <option name="FILTER_TARGETS" value="false" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="200">
-          <caret line="13" column="37" selection-start-line="13" selection-start-column="37" selection-end-line="13" selection-end-column="37" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/tfidf/TFIDF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
@@ -658,110 +822,35 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/TopicUtil.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3300">
           <caret line="162" column="63" selection-start-line="162" selection-start-column="63" selection-end-line="162" selection-end-column="63" />
           <folding>
-            <element signature="e#8224#8225#0" expanded="true" />
-            <element signature="e#8294#8295#0" expanded="true" />
+            <element signature="imports" expanded="false" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/MeasureUtil.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/MeasureUtil.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="300">
           <caret line="12" column="26" selection-start-line="12" selection-start-column="26" selection-end-line="12" selection-end-column="26" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicConstant.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/TopicConstant.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="275">
           <caret line="11" column="14" selection-start-line="11" selection-start-column="14" selection-end-line="11" selection-end-column="14" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/nmf/NMF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="425">
           <caret line="36" column="11" selection-start-line="36" selection-start-column="11" selection-end-line="36" selection-end-column="11" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <element signature="e#5177#5185#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2775">
-          <caret line="138" column="47" selection-start-line="138" selection-start-column="47" selection-end-line="138" selection-end-column="47" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <marker date="1477134298731" expanded="true" signature="4602:4610" ph="&lt;~&gt;" />
-            <marker date="1477134298731" expanded="true" signature="4986:4999" ph="&lt;~&gt;" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1600">
-          <caret line="74" column="33" selection-start-line="74" selection-start-column="33" selection-end-line="74" selection-end-column="33" />
           <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="200">
-          <caret line="13" column="37" selection-start-line="13" selection-start-column="37" selection-end-line="13" selection-end-column="37" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="3300">
-          <caret line="162" column="63" selection-start-line="162" selection-start-column="63" selection-end-line="162" selection-end-column="63" />
-          <folding>
-            <element signature="e#8224#8225#0" expanded="true" />
-            <element signature="e#8294#8295#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/MeasureUtil.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="300">
-          <caret line="12" column="26" selection-start-line="12" selection-start-column="26" selection-end-line="12" selection-end-column="26" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicConstant.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="275">
-          <caret line="11" column="14" selection-start-line="11" selection-start-column="14" selection-end-line="11" selection-end-column="14" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="425">
-          <caret line="36" column="11" selection-start-line="36" selection-start-column="11" selection-end-line="36" selection-end-column="11" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <element signature="e#5177#5185#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -771,13 +860,13 @@
           <caret line="162" column="49" selection-start-line="162" selection-start-column="49" selection-end-line="162" selection-end-column="49" />
           <folding>
             <element signature="imports" expanded="true" />
-            <marker date="1477134298731" expanded="true" signature="4602:4610" ph="&lt;~&gt;" />
-            <marker date="1477134298731" expanded="true" signature="4986:4999" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="4791:4799" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="5175:5188" ph="&lt;~&gt;" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/JoinMentionString.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1600">
           <caret line="74" column="33" selection-start-line="74" selection-start-column="33" selection-end-line="74" selection-end-column="33" />
@@ -785,14 +874,14 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/GetMentionEntry.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="200">
           <caret line="13" column="37" selection-start-line="13" selection-start-column="37" selection-end-line="13" selection-end-column="37" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/tfidf/TFIDF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1225">
           <caret line="67" column="119" selection-start-line="67" selection-start-column="119" selection-end-line="67" selection-end-column="119" />
@@ -800,39 +889,35 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/TopicUtil.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3300">
           <caret line="162" column="63" selection-start-line="162" selection-start-column="63" selection-end-line="162" selection-end-column="63" />
           <folding>
-            <element signature="e#8224#8225#0" expanded="true" />
-            <element signature="e#8294#8295#0" expanded="true" />
+            <element signature="imports" expanded="false" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/MeasureUtil.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/MeasureUtil.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="300">
           <caret line="12" column="26" selection-start-line="12" selection-start-column="26" selection-end-line="12" selection-end-column="26" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicConstant.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/TopicConstant.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="275">
           <caret line="11" column="14" selection-start-line="11" selection-start-column="14" selection-end-line="11" selection-end-column="14" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/nmf/NMF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <element signature="e#5177#5185#0" expanded="true" />
-          </folding>
+          <folding />
         </state>
       </provider>
     </entry>
@@ -842,13 +927,13 @@
           <caret line="105" column="57" selection-start-line="105" selection-start-column="57" selection-end-line="105" selection-end-column="57" />
           <folding>
             <element signature="imports" expanded="true" />
-            <marker date="1477134298731" expanded="true" signature="4602:4610" ph="&lt;~&gt;" />
-            <marker date="1477134298731" expanded="true" signature="4986:4999" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="4791:4799" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="5175:5188" ph="&lt;~&gt;" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/JoinMentionString.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="200">
           <caret line="18" column="11" selection-start-line="18" selection-start-column="11" selection-end-line="18" selection-end-column="11" />
@@ -856,14 +941,14 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/GetMentionEntry.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="100">
           <caret line="9" column="13" selection-start-line="9" selection-start-column="13" selection-end-line="9" selection-end-column="13" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/tfidf/TFIDF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1625">
           <caret line="69" column="18" selection-start-line="69" selection-start-column="18" selection-end-line="69" selection-end-column="18" />
@@ -871,14 +956,11 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/nmf/NMF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <element signature="e#5177#5185#0" expanded="true" />
-          </folding>
+          <folding />
         </state>
       </provider>
     </entry>
@@ -888,13 +970,13 @@
           <caret line="147" column="46" selection-start-line="147" selection-start-column="46" selection-end-line="147" selection-end-column="46" />
           <folding>
             <element signature="imports" expanded="true" />
-            <marker date="1477134298731" expanded="true" signature="4602:4610" ph="&lt;~&gt;" />
-            <marker date="1477134298731" expanded="true" signature="4986:4999" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="4791:4799" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="5175:5188" ph="&lt;~&gt;" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/JoinMentionString.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="700">
           <caret line="38" column="28" selection-start-line="38" selection-start-column="22" selection-end-line="38" selection-end-column="28" />
@@ -902,14 +984,14 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/GetMentionEntry.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="100">
           <caret line="9" column="13" selection-start-line="9" selection-start-column="13" selection-end-line="9" selection-end-column="13" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/tfidf/TFIDF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
@@ -917,14 +999,11 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/nmf/NMF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="900">
           <caret line="36" column="18" selection-start-line="36" selection-start-column="18" selection-end-line="36" selection-end-column="18" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <element signature="e#5177#5185#0" expanded="true" />
-          </folding>
+          <folding />
         </state>
       </provider>
     </entry>
@@ -934,38 +1013,27 @@
           <caret line="135" column="27" selection-start-line="135" selection-start-column="27" selection-end-line="135" selection-end-column="27" />
           <folding>
             <element signature="imports" expanded="true" />
-            <marker date="1477134298731" expanded="true" signature="4602:4610" ph="&lt;~&gt;" />
-            <marker date="1477134298731" expanded="true" signature="4986:4999" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="4791:4799" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="5175:5188" ph="&lt;~&gt;" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/nmf/NMF.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <element signature="e#5177#5185#0" expanded="true" />
-          </folding>
+          <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/TopicUtil.java">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="950">
           <caret line="47" column="44" selection-start-line="47" selection-start-column="44" selection-end-line="47" selection-end-column="44" />
           <folding>
-            <element signature="e#8224#8225#0" expanded="true" />
-            <element signature="e#8294#8295#0" expanded="true" />
+            <element signature="imports" expanded="false" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="jar://$MAVEN_REPOSITORY$/org/apache/spark/spark-core_2.10/2.0.0/spark-core_2.10-2.0.0.jar!/org/apache/spark/scheduler/Task.class">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="166">
-          <caret line="40" column="117" selection-start-line="40" selection-start-column="117" selection-end-line="40" selection-end-column="117" />
         </state>
       </provider>
     </entry>
@@ -1011,84 +1079,151 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/MeasureUtil.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/Util/GetMentionEntryReverse.java" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/app/Main.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="300">
-          <caret line="12" column="26" selection-start-line="12" selection-start-column="26" selection-end-line="12" selection-end-column="26" />
+        <state relative-caret-position="125">
+          <caret line="27" column="13" selection-start-line="27" selection-start-column="13" selection-end-line="27" selection-end-column="13" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/GetMentionEntry.java">
+    <entry file="jar://$MAVEN_REPOSITORY$/org/apache/spark/spark-core_2.10/2.0.0/spark-core_2.10-2.0.0.jar!/org/apache/spark/api/java/JavaRDD.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="350">
+          <caret line="15" column="46" selection-start-line="15" selection-start-column="46" selection-end-line="15" selection-end-column="46" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/log4j.properties">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="200">
-          <caret line="13" column="37" selection-start-line="13" selection-start-column="37" selection-end-line="13" selection-end-column="37" />
+          <caret line="8" column="43" selection-start-line="8" selection-start-column="43" selection-end-line="8" selection-end-column="43" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/JoinMentionString.java">
+    <entry file="jar://$MAVEN_REPOSITORY$/org/apache/spark/spark-core_2.10/2.0.0/spark-core_2.10-2.0.0.jar!/org/apache/spark/scheduler/Task.class">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="400">
-          <caret line="23" column="25" selection-start-line="23" selection-start-column="25" selection-end-line="23" selection-end-column="25" />
+        <state relative-caret-position="166">
+          <caret line="40" column="117" selection-start-line="40" selection-start-column="117" selection-end-line="40" selection-end-column="117" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/.classpath">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://C:/Program Files/Java/jdk1.8.0_74/src.zip!/java/util/Locale.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="157">
+          <caret line="489" column="31" selection-start-line="489" selection-start-column="31" selection-end-line="489" selection-end-column="31" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/TopicConstant.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="325">
+          <caret line="13" column="52" selection-start-line="13" selection-start-column="52" selection-end-line="13" selection-end-column="52" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/WriteToJSON.java">
+    <entry file="jar://C:/Program Files/Java/jdk1.8.0_74/src.zip!/java/util/function/Function.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="600">
-          <caret line="31" column="0" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
+        <state relative-caret-position="283">
+          <caret line="48" column="6" selection-start-line="48" selection-start-column="6" selection-end-line="48" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/GetTopTopicWord.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="12" column="41" selection-start-line="12" selection-start-column="41" selection-end-line="12" selection-end-column="41" />
           <folding>
             <element signature="imports" expanded="false" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicConstant.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/tfidf/TFIDF.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="275">
-          <caret line="11" column="14" selection-start-line="11" selection-start-column="14" selection-end-line="11" selection-end-column="14" />
+        <state relative-caret-position="1375">
+          <caret line="78" column="69" selection-start-line="78" selection-start-column="69" selection-end-line="78" selection-end-column="69" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TFIDF/TFIDF.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/GetMentionEntry.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="262">
-          <caret line="71" column="8" selection-start-line="71" selection-start-column="8" selection-end-line="71" selection-end-column="8" />
+        <state relative-caret-position="0">
+          <caret line="11" column="81" selection-start-line="11" selection-start-column="81" selection-end-line="11" selection-end-column="81" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/TopicUtil.java">
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/MeasureUtil.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="598">
-          <caret line="206" column="25" selection-start-line="206" selection-start-column="25" selection-end-line="206" selection-end-column="25" />
+        <state relative-caret-position="-2231">
+          <caret line="51" column="50" selection-start-line="51" selection-start-column="50" selection-end-line="51" selection-end-column="50" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/TopicUtil.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="825">
+          <caret line="56" column="0" selection-start-line="56" selection-start-column="0" selection-end-line="56" selection-end-column="0" />
           <folding>
-            <element signature="e#8224#8225#0" expanded="true" />
-            <element signature="e#8294#8295#0" expanded="true" />
+            <element signature="imports" expanded="false" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/JoinMentionString.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1225">
+          <caret line="56" column="16" selection-start-line="56" selection-start-column="16" selection-end-line="56" selection-end-column="16" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/nmf/NMF.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="150">
+          <caret line="28" column="31" selection-start-line="28" selection-start-column="31" selection-end-line="28" selection-end-column="31" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/util/WriteToJSON.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="116">
+          <caret line="15" column="45" selection-start-line="15" selection-start-column="35" selection-end-line="15" selection-end-column="45" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/vo/TweetInfo.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="100">
+          <caret line="4" column="46" selection-start-line="4" selection-start-column="46" selection-end-line="4" selection-end-column="46" />
+          <folding>
+            <element signature="e#532#533#0" expanded="true" />
+            <element signature="e#551#552#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main/java/topicDerivation/TopicMain.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="125">
-          <caret line="177" column="8" selection-start-line="177" selection-start-column="8" selection-end-line="177" selection-end-column="8" />
+        <state relative-caret-position="384">
+          <caret line="112" column="19" selection-start-line="112" selection-start-column="19" selection-end-line="112" selection-end-column="19" />
           <folding>
             <element signature="imports" expanded="true" />
-            <marker date="1477134298731" expanded="true" signature="4602:4610" ph="&lt;~&gt;" />
-            <marker date="1477134298731" expanded="true" signature="4986:4999" ph="&lt;~&gt;" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/Util/NMF/NMF.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="234">
-          <caret line="158" column="25" selection-start-line="158" selection-start-column="25" selection-end-line="158" selection-end-column="25" />
-          <folding>
-            <element signature="imports" expanded="true" />
-            <element signature="e#5177#5185#0" expanded="true" />
+            <marker date="1479136724194" expanded="true" signature="4791:4799" ph="&lt;~&gt;" />
+            <marker date="1479136724194" expanded="true" signature="5175:5188" ph="&lt;~&gt;" />
           </folding>
         </state>
       </provider>
@@ -1150,6 +1285,7 @@
             <option name="proportions">
               <list>
                 <option value="0.2" />
+                <option value="0.6" />
               </list>
             </option>
           </splitter-proportions>
