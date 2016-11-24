@@ -1,6 +1,5 @@
 package topicDerivation;
 
-import au.com.bytecode.opencsv.CSVReader;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -16,12 +15,12 @@ import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.util.DoubleAccumulator;
+import org.apache.spark.util.LongAccumulator;
 import util.*;
 import util.nmf.NMF;
 import util.tfidf.TFIDF;
 import vo.TweetInfo;
 
-import java.io.StringReader;
 import java.util.*;
 
 public class TopicMain {
@@ -40,6 +39,20 @@ public class TopicMain {
 									.config("spark.sql.warehouse.dir","file:///")
 									.getOrCreate();
 
+		//wait to convert to arguments
+		int numFactors = 20;
+		//parse the arguments
+//		TopicConstant cmdArgs = new TopicConstant();
+//		CmdLineParser parser = new CmdLineParser(cmdArgs);
+//		try {
+//			parser.parseArgument(args);
+//			System.out.println(TopicConstant.numIters);
+//		} catch (CmdLineException e) {
+//			// handling of wrong arguments
+//			System.err.println(e.getMessage());
+//			parser.printUsage(System.err);
+//		}
+
 		JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
 
 		final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
@@ -53,25 +66,25 @@ public class TopicMain {
 		String outFilePath = args[1];
 		double maxCoherenceValue=-Double.MAX_VALUE;
 
-		//wait to convert to arguments
-		int numIters = 10;
-		int numFactors = 20;
-
 		//drop the no use column
 		Dataset<Row> currDataset = csvDataset.drop("polarity","noUse");
 		//new tfidf(currDataset).buildModel();
 
-		//encode string to index
-		StringIndexer indexer = new StringIndexer()
-				.setInputCol("oldTweetId")
-				.setOutputCol("tweetId");
-		Dataset<Row> indexed = indexer.fit(currDataset).transform(currDataset);
+		//no need , encode string to index
+//		StringIndexer indexer = new StringIndexer()
+//				.setInputCol("oldTweetId")
+//				.setOutputCol("tweetId");
+//		Dataset<Row> indexed = indexer.fit(currDataset).transform(currDataset);
+
+		//add accumulator
+		LongAccumulator tweetIDAccumulator = sc.sc().longAccumulator();
 
 		//set custom javaRDD and compute the mentionMen
-		JavaRDD<TweetInfo> tweetJavaRDD= indexed.javaRDD().map(new Function<Row, TweetInfo>() {
+		JavaRDD<TweetInfo> tweetJavaRDD= currDataset.javaRDD().map(new Function<Row, TweetInfo>() {
 			public TweetInfo call(Row row)throws Exception{
 				TweetInfo tweet = new TweetInfo();
-				tweet.setTweetId(row.getAs("tweetId").toString());
+				tweetIDAccumulator.add(1);
+				tweet.setTweetId(tweetIDAccumulator.value().toString());
 				tweet.setDateString(row.getAs("date").toString());
 				tweet.setUserName(row.getAs("userName").toString());
 				tweet.setTweet(row.getAs("tweet").toString());
@@ -160,7 +173,7 @@ public class TopicMain {
 		//System.out.println(poMatrix.count());
 
 		//interaction
-		NMF interactionNMF = new NMF(poMatrix,true,sparkSession,numIters,numFactors);
+		NMF interactionNMF = new NMF(poMatrix,true,sparkSession,TopicConstant.numIters,numFactors);
 		interactionNMF.buildNMFModel();
 		CoordinateMatrix W = interactionNMF.getW();
 
@@ -192,9 +205,12 @@ public class TopicMain {
 		Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(),schemaTFIDF);
 
 		//tfidf
-		TFIDF tfidf = new TFIDF(sentenceData);
+		Broadcast<HashMap<String,String>> brTweetIDMap = sc.broadcast(new HashMap<String,String>());
+		Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
+
+		TFIDF tfidf = new TFIDF(sentenceData , brTweetIDMap ,brHashSet ,sc.sc().longAccumulator());
 		tfidf.buildModel();
-		NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(),false,sparkSession,numIters,numFactors);
+		NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(),false,sparkSession,TopicConstant.numIters,numFactors);
 		System.out.println(W.entries().count());
 		tfidfNMF.setW(W);
 		tfidfNMF.buildNMFModel();
@@ -226,7 +242,7 @@ public class TopicMain {
 					@Override
 					public int compare( Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2 )
 					{
-						return ( o2.getValue() ).compareTo( o1.getValue() );
+						return ( o2.getValue()  ).compareTo( o1.getValue());
 					}
 				} );
 

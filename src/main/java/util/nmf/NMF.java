@@ -21,7 +21,6 @@ import java.util.List;
 
 public class NMF implements Serializable {
 	private int numIters;
-	private int numFactors;
 	private double initialNum = 0.01;
 	private long numRows , numCols;
 	//private DenseMatrix W,H,minW,minH;
@@ -36,7 +35,7 @@ public class NMF implements Serializable {
 		boolUpdateW = isUpdateW;
 		minKLDivergence = Double.MAX_VALUE;
 		numIters = paraIters;
-		numFactors = paraFactors;
+		int numFactors = paraFactors;
 		//initialize to zero or other method
 		//double[] dbArray =new double[(int)(V.numRows() * numFactors)];
         //Arrays.fill(dbArray,0.01);
@@ -48,7 +47,7 @@ public class NMF implements Serializable {
 		numCols = V.numCols();
 		List<Double> tmpDBList= new ArrayList<Double>();
 		//dummy factor row
-		for (int i=0;i<numFactors;i++){
+		for (int i = 0; i< numFactors; i++){
 			tmpDBList.add(initialNum);
 		}
 
@@ -82,7 +81,7 @@ public class NMF implements Serializable {
 			System.out.println(W.entries().count());
 		}
 		tmpDBList = new ArrayList<Double>();
-		for (int i=0;i<numFactors;i++){
+		for (int i = 0; i< numFactors; i++){
 			tmpDBList.add(initialNum);
 		}
 
@@ -110,8 +109,8 @@ public class NMF implements Serializable {
 //			}
 //		});
 
-		H = new CoordinateMatrix(tmpHEntryRDD.rdd(),numFactors,numCols);
-		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(),numFactors,numCols);
+		H = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
+		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
 		System.out.println(H.entries().count());
 //		H.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
 //			@Override
