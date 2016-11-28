@@ -6,17 +6,12 @@ import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.ml.feature.*;
-import org.apache.spark.ml.feature.HashingTF;
-import org.apache.spark.ml.feature.IDF;
-import org.apache.spark.ml.feature.IDFModel;
 import org.apache.spark.ml.linalg.Vector;
-import org.apache.spark.mllib.feature.*;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.util.LongAccumulator;
-import util.TopicConstant;
 
 import java.io.Serializable;
 import java.util.*;
@@ -30,14 +25,17 @@ public class TFIDF implements Serializable{
 		return tfidfDataSet;
 	}
 	private Broadcast<HashMap<String,String>> brTweetIDMap;
+	private Broadcast<HashMap<String,String>> brTweetWordMap;
 	private Broadcast<HashSet<String>> brHashSet;
-	private LongAccumulator tweetIDAccumulator;
+	private LongAccumulator IDAccumulator;
 
-	public TFIDF(Dataset<Row> rdd, Broadcast<HashMap<String,String>> paraTweetIDMap , Broadcast<HashSet<String>> paraHashSet , LongAccumulator paraLongAccumulator){
+	public TFIDF(Dataset<Row> rdd , Broadcast<HashMap<String,String>> paraTweetIDMap, Broadcast<HashMap<String,String>> paraTweetWordMap ,
+				 Broadcast<HashSet<String>> paraHashSet , LongAccumulator paraTweetIDAccumulator){
 		tweetDataset = rdd;
 		brTweetIDMap = paraTweetIDMap;
+		brTweetWordMap = paraTweetWordMap;
 		brHashSet = paraHashSet;
-		tweetIDAccumulator = paraLongAccumulator;
+		IDAccumulator = paraTweetIDAccumulator;
 	}
 	
 	//tweet:original message
@@ -61,66 +59,81 @@ public class TFIDF implements Serializable{
 		org.apache.spark.mllib.feature.HashingTF tf = new org.apache.spark.mllib.feature.HashingTF();
 		//tfidf for ml start
 
-//		JavaRDD<List<String>> listJavaRDD = filterData.select("words").toJavaRDD().map(new Function<Row, List<String>>() {
-//			@Override
-//			public List<String> call(Row v1) throws Exception {
-//				List<String> stringList = v1.getList(0);
-//				return stringList;
-//			}
-//		});
-//
-//		JavaRDD<org.apache.spark.mllib.linalg.Vector> termFreqs = tf.transform(listJavaRDD);
-//		for(Object obj:brHashSet.getValue().toArray()){
-//			System.out.println("index:"+tf.indexOf(obj.toString())+",word:"+obj.toString());
-//			brTweetIDMap.getValue().put(String.valueOf(tf.indexOf(obj.toString())), obj.toString());
-//		}
-//		tweetIDMap = brTweetIDMap.getValue();
-//
-//		org.apache.spark.mllib.feature.IDF idfMllib = new org.apache.spark.mllib.feature.IDF();
-//		JavaRDD<org.apache.spark.mllib.linalg.Vector> tfIdfs = idfMllib.fit(termFreqs).transform(termFreqs);
-//		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
-//															   @Override
-//															   public Iterator<MatrixEntry> call(org.apache.spark.mllib.linalg.Vector vector) throws Exception {
-//																   List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-//																   tweetIDAccumulator.add(1);
-//																   for (int i : vector.toSparse().indices()) {
-//																	   arrayList.add(new MatrixEntry(Double.valueOf(tweetIDAccumulator.value().toString()).longValue(), (long) i, vector.toArray()[i]));
-//																   }
-//																   return arrayList.iterator();
-//															   }
-//														   });
-//		entryJavaRDD.collect();
+		JavaRDD<List<String>> listJavaRDD = filterData.select("words").toJavaRDD().map(new Function<Row, List<String>>() {
+			@Override
+			public List<String> call(Row v1) throws Exception {
+				List<String> stringList = v1.getList(0);
+				return stringList;
+			}
+		});
+
+		JavaRDD<org.apache.spark.mllib.linalg.Vector> termFreqs = tf.transform(listJavaRDD);
+		for(Object obj:brHashSet.getValue().toArray()){
+			System.out.println("index:"+tf.indexOf(obj.toString())+",word:"+obj.toString());
+			brTweetIDMap.getValue().put(String.valueOf(tf.indexOf(obj.toString())), obj.toString());
+		}
+
+		org.apache.spark.mllib.feature.IDF idfMllib = new org.apache.spark.mllib.feature.IDF();
+		JavaRDD<org.apache.spark.mllib.linalg.Vector> tfIdfs = idfMllib.fit(termFreqs).transform(termFreqs);
+		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
+															   @Override
+															   public Iterator<MatrixEntry> call(org.apache.spark.mllib.linalg.Vector vector) throws Exception {
+																   List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+																   long matrixIdx=0;
+																   IDAccumulator.add(1);
+																   for (int i : vector.toSparse().indices()) {
+																	   if(brTweetWordMap.getValue().containsValue(brTweetIDMap.getValue().get(String.valueOf(i)))==false){
+																		   matrixIdx = Long.valueOf(brTweetWordMap.getValue().size()+1);
+																		   brTweetWordMap.getValue().put(String.valueOf(matrixIdx) , brTweetIDMap.getValue().get(String.valueOf(i)));
+																	   }else{
+																		   Iterator<Map.Entry<String,String>> iter =brTweetWordMap.getValue().entrySet().iterator();
+																		   while (iter.hasNext()){
+																			   Map.Entry<String,String> entry = iter.next();
+																			   if(entry.getValue().equals(brTweetIDMap.getValue().get(String.valueOf(i)))){
+																				   matrixIdx = Long.valueOf(entry.getKey());
+																				   break;
+																			   }
+																		   }
+																	   }
+																	   arrayList.add(new MatrixEntry(Double.valueOf(IDAccumulator.value().toString()).longValue(), matrixIdx, vector.toArray()[i]));
+																   }
+																   return arrayList.iterator();
+															   }
+														   });
+		tweetIDMap = brTweetWordMap.getValue();
+
+		entryJavaRDD.collect();
 
 		//tfidf for ml end
 
 		//tfidf for mllib start
 
-		HashingTF hashingTF = new HashingTF()
-								  .setInputCol("words")
-								  .setOutputCol("rawFeatures")
-								  .setNumFeatures(TopicConstant.numFeatures);
-
-		Dataset<Row> featurizedData = hashingTF.transform(filterData);
-
-		IDF idf = new IDF().setInputCol("rawFeatures").setOutputCol("features");
-		IDFModel idfModel = idf.fit(featurizedData);
-		Dataset<Row> rescaledData = idfModel.transform(featurizedData);
-
-		rescaledData.select("tweetId","words","features","rawFeatures").toJavaRDD().foreach(new RowVoidFunction(brTweetIDMap));
-
-
-		tfidfDataSet = rescaledData;
-
-		JavaRDD<MatrixEntry> entryJavaRDD = tfidfDataSet.toJavaRDD().flatMap((FlatMapFunction<Row,MatrixEntry>) row ->{
-			List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-			String id = row.getAs("tweetId");
-			Vector feature = row.getAs("features");
-			for(int i : feature.toSparse().indices()){
-				arrayList.add(new MatrixEntry(Double.valueOf(id).longValue(),(long)i,feature.toArray()[i]));
-			}
-			return arrayList.iterator();
-		});
-		entryJavaRDD.count();
+//		HashingTF hashingTF = new HashingTF()
+//								  .setInputCol("words")
+//								  .setOutputCol("rawFeatures")
+//								  .setNumFeatures(TopicConstant.numFeatures);
+//
+//		Dataset<Row> featurizedData = hashingTF.transform(filterData);
+//
+//		IDF idf = new IDF().setInputCol("rawFeatures").setOutputCol("features");
+//		IDFModel idfModel = idf.fit(featurizedData);
+//		Dataset<Row> rescaledData = idfModel.transform(featurizedData);
+//
+//		rescaledData.select("tweetId","words","features","rawFeatures").toJavaRDD().foreach(new RowVoidFunction(brTweetIDMap));
+//
+//
+//		tfidfDataSet = rescaledData;
+//
+//		JavaRDD<MatrixEntry> entryJavaRDD = tfidfDataSet.toJavaRDD().flatMap((FlatMapFunction<Row,MatrixEntry>) row ->{
+//			List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+//			String id = row.getAs("tweetId");
+//			Vector feature = row.getAs("features");
+//			for(int i : feature.toSparse().indices()){
+//				arrayList.add(new MatrixEntry(Double.valueOf(id).longValue(),(long)i,feature.toArray()[i]));
+//			}
+//			return arrayList.iterator();
+//		});
+//		entryJavaRDD.count();
 
 		//tfidf for mllib end
 
@@ -192,7 +205,7 @@ public class TFIDF implements Serializable{
         }
 	}
 
-	private class filterRowFunction implements VoidFunction<Row> {
+	private class filterRowFunction implements VoidFunction<Row>{
 		private Broadcast<HashSet<String>> tokenHashSet;
 
 		public filterRowFunction(Broadcast<HashSet<String>> paraBr){

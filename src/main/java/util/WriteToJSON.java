@@ -28,6 +28,11 @@ public class WriteToJSON implements Function<LinkedHashMap<Integer,Double>,Strin
             }
             System.out.println("tweet:"+tweetIDMap.get(entry.getKey().toString()));
             resultMap.put(tweetIDMap.get(entry.getKey().toString()),entry.getValue());
+
+            //set the top topic word limit
+            if(resultMap.size()>= TopicConstant.numTopWords){
+                break;
+            }
         }
         resultStr = mapper.writeValueAsString(resultMap);
 

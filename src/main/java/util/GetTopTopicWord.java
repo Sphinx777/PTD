@@ -8,7 +8,7 @@ import java.util.*;
  * Created by user on 2016/11/12.
  */
 public class GetTopTopicWord implements Function<LinkedHashMap<Integer,Double>,String[]> {
-    private final int intTopWordCnt = 10;
+    //private final int intTopWordCnt = 10;
     private HashMap<String,String> tweetIDMap = new HashMap<String,String>();
     public  GetTopTopicWord(HashMap<String,String> srcMap){
         tweetIDMap = srcMap;
@@ -23,9 +23,15 @@ public class GetTopTopicWord implements Function<LinkedHashMap<Integer,Double>,S
             }
             System.out.println("tweet:"+tweetIDMap.get(entry.getKey().toString()));
             stringArrayList.add(tweetIDMap.get(entry.getKey().toString()));
+
+            //stop condition 1--top word limit
+    //            if(stringArrayList.size()>=TopicConstant.numTopWords){
+    //                break;
+    //            }
         }
         System.out.println(stringArrayList.toArray());
-        String[] resultArray = Arrays.copyOfRange(stringArrayList.toArray(new String[stringArrayList.size()]),0,intTopWordCnt);
+        //stop condition 2--copy range of  array
+        String[] resultArray = Arrays.copyOfRange(stringArrayList.toArray(new String[stringArrayList.size()]),0,TopicConstant.numTopWords);
         return resultArray;
     }
 }

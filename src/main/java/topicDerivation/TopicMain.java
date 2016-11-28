@@ -5,7 +5,6 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.broadcast.Broadcast;
-import org.apache.spark.ml.feature.StringIndexer;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
@@ -16,6 +15,8 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
 import util.*;
 import util.nmf.NMF;
 import util.tfidf.TFIDF;
@@ -26,11 +27,25 @@ import java.util.*;
 public class TopicMain {
 	//10 dataset:
 	//300 dataset:D:\Oracle\VirtualBox\sharefolder\testData.csv D:\MySyncFolder\Java\workspace\app\out\production\main\result
+	//input argument:-iters 10 -factor 5 -top 10 -input D:\Oracle\VirtualBox\sharefolder\testData.csv -output D:\MySyncFolder\Java\workspace\app\out\production\main\result
 	public static SparkSession  sparkSession;
 	static Logger logger = Logger.getLogger(TopicMain.class.getName());
 
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
+		//parse the arguments
+		TopicConstant cmdArgs = new TopicConstant();
+		CmdLineParser parser = new CmdLineParser(cmdArgs);
+		try {
+			parser.parseArgument(args);
+			System.out.println(TopicConstant.numIters);
+		} catch (CmdLineException e) {
+			// handling of wrong arguments
+			System.err.println(e.getMessage());
+			parser.printUsage(System.err);
+			logger.info(e.getMessage());
+		}
+
 		System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 		logger.info("start");
 
@@ -38,20 +53,6 @@ public class TopicMain {
 									.appName("TopicDerivation")
 									.config("spark.sql.warehouse.dir","file:///")
 									.getOrCreate();
-
-		//wait to convert to arguments
-		int numFactors = 20;
-		//parse the arguments
-//		TopicConstant cmdArgs = new TopicConstant();
-//		CmdLineParser parser = new CmdLineParser(cmdArgs);
-//		try {
-//			parser.parseArgument(args);
-//			System.out.println(TopicConstant.numIters);
-//		} catch (CmdLineException e) {
-//			// handling of wrong arguments
-//			System.err.println(e.getMessage());
-//			parser.printUsage(System.err);
-//		}
 
 		JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
 
@@ -61,9 +62,9 @@ public class TopicMain {
 									.add("noUse","string").add("userName","string").add("tweet","string")
 									.add("mentionMen","string").add("userInteraction","string");
 
-		Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(args[0]);
+		Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(TopicConstant.inputFilePath);
 
-		String outFilePath = args[1];
+		String outFilePath = TopicConstant.outputFilePath;
 		double maxCoherenceValue=-Double.MAX_VALUE;
 
 		//drop the no use column
@@ -173,7 +174,7 @@ public class TopicMain {
 		//System.out.println(poMatrix.count());
 
 		//interaction
-		NMF interactionNMF = new NMF(poMatrix,true,sparkSession,TopicConstant.numIters,numFactors);
+		NMF interactionNMF = new NMF(poMatrix,true,sparkSession);
 		interactionNMF.buildNMFModel();
 		CoordinateMatrix W = interactionNMF.getW();
 
@@ -206,11 +207,13 @@ public class TopicMain {
 
 		//tfidf
 		Broadcast<HashMap<String,String>> brTweetIDMap = sc.broadcast(new HashMap<String,String>());
+		Broadcast<HashMap<String,String>> brTweetWordMap = sc.broadcast(new HashMap<String,String>());
 		Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
+		tweetIDAccumulator.reset();
 
-		TFIDF tfidf = new TFIDF(sentenceData , brTweetIDMap ,brHashSet ,sc.sc().longAccumulator());
+		TFIDF tfidf = new TFIDF(sentenceData , brTweetIDMap,brTweetWordMap,brHashSet,sc.sc().longAccumulator());
 		tfidf.buildModel();
-		NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(),false,sparkSession,TopicConstant.numIters,numFactors);
+		NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(),false,sparkSession);
 		System.out.println(W.entries().count());
 		tfidfNMF.setW(W);
 		tfidfNMF.buildNMFModel();
@@ -280,8 +283,8 @@ public class TopicMain {
 			}
 			dbAccumulator.add(tmpCoherenceValue);
 		}
-		System.out.println("Max Topic coherence value:"+maxCoherenceValue);
-		System.out.println("Average topic coherence value:"+dbAccumulator.value()/(double)topicWordList.size());
+		System.out.println("Max Topic coherence value of top " + TopicConstant.numTopWords + " words:"+maxCoherenceValue);
+		System.out.println("Average topic coherence value of top " + TopicConstant.numTopWords + " words:"+dbAccumulator.value()/(double)topicWordList.size());
 		//Object vs = poMatrix.toRowMatrix().rows().take(1);
 		//Encoders.STRING()
 		//Dataset<Vector> dss = sparkSession.createDataset(rdd.rdd(), Encoders.bean(Double.class));

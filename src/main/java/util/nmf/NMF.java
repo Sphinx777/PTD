@@ -20,7 +20,6 @@ import java.util.Iterator;
 import java.util.List;
 
 public class NMF implements Serializable {
-	private int numIters;
 	private double initialNum = 0.01;
 	private long numRows , numCols;
 	//private DenseMatrix W,H,minW,minH;
@@ -30,12 +29,10 @@ public class NMF implements Serializable {
 	private boolean boolUpdateW;
 	private SparkSession sparkSession;
 
-	public NMF(CoordinateMatrix matV,boolean isUpdateW,SparkSession paraSparkSession,int paraIters,int paraFactors) {
+	public NMF(CoordinateMatrix matV,boolean isUpdateW,SparkSession paraSparkSession) {
 		V = matV;
 		boolUpdateW = isUpdateW;
 		minKLDivergence = Double.MAX_VALUE;
-		numIters = paraIters;
-		int numFactors = paraFactors;
 		//initialize to zero or other method
 		//double[] dbArray =new double[(int)(V.numRows() * numFactors)];
         //Arrays.fill(dbArray,0.01);
@@ -47,7 +44,7 @@ public class NMF implements Serializable {
 		numCols = V.numCols();
 		List<Double> tmpDBList= new ArrayList<Double>();
 		//dummy factor row
-		for (int i = 0; i< numFactors; i++){
+		for (int i = 0; i< TopicConstant.numFactors; i++){
 			tmpDBList.add(initialNum);
 		}
 
@@ -76,12 +73,12 @@ public class NMF implements Serializable {
 //		});
 		System.out.println(tmpWEntryRDD.count());
 		if(boolUpdateW) {
-			W = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
-			minW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
+			W = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, TopicConstant.numFactors);
+			minW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, TopicConstant.numFactors);
 			System.out.println(W.entries().count());
 		}
 		tmpDBList = new ArrayList<Double>();
-		for (int i = 0; i< numFactors; i++){
+		for (int i = 0; i< TopicConstant.numFactors; i++){
 			tmpDBList.add(initialNum);
 		}
 
@@ -109,8 +106,8 @@ public class NMF implements Serializable {
 //			}
 //		});
 
-		H = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
-		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
+		H = new CoordinateMatrix(tmpHEntryRDD.rdd(), TopicConstant.numFactors,numCols);
+		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(), TopicConstant.numFactors,numCols);
 		System.out.println(H.entries().count());
 //		H.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
 //			@Override
@@ -129,7 +126,7 @@ public class NMF implements Serializable {
 	//update W,H
 	public void buildNMFModel(){
 		final ArrayList<Double> tmpKLDivergenceList = new ArrayList<Double>();
-		for(int iter=0;iter<numIters;iter++) {
+		for(int iter=0;iter<TopicConstant.numIters;iter++) {
 			CoordinateMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, W.transpose().toBlockMatrix().multiply(V.toBlockMatrix()).toCoordinateMatrix(), W.transpose().toBlockMatrix().multiply(W.toBlockMatrix()).multiply(H.toBlockMatrix()).toCoordinateMatrix());
 			HUpdateMatrix.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
 				@Override
