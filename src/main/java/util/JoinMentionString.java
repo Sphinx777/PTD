@@ -59,7 +59,9 @@ public class JoinMentionString implements Function<TweetInfo, String>{
 		        dbValue += dbCosValue;
 
 				//weighted by time-factor
-				dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(),row.getAs("dateString").toString(),currDate);
+				if(TopicConstant.model.trim().toUpperCase().equals("DTTD")) {
+					dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(), row.getAs("dateString").toString(), currDate);
+				}
 
 		        //passing the sigmoid
 		        dbValue = TopicUtil.calculateSigmoid(dbValue);

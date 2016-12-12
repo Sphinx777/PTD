@@ -28,4 +28,7 @@ public class TopicConstant {
 
 	@Option(name="-output",usage="Sets a path of output")
 	public static String outputFilePath;
+
+	@Option(name="-model",usage="Sets a model(DTTD , intJNMF)")
+	public static String model;
 }
