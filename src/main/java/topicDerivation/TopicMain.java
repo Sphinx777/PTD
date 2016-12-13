@@ -22,6 +22,7 @@ import util.nmf.NMF;
 import util.tfidf.TFIDF;
 import vo.TweetInfo;
 
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class TopicMain {
@@ -64,7 +65,8 @@ public class TopicMain {
 
 		Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(TopicConstant.inputFilePath);
 
-		String outFilePath = TopicConstant.outputFilePath;
+		SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
+		String outFilePath = TopicConstant.outputFilePath+"_"+sdf.format((Date) broadcastCurrDate.getValue());
 		double maxCoherenceValue=-Double.MAX_VALUE;
 
 		//drop the no use column

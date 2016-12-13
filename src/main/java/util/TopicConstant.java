@@ -12,6 +12,7 @@ public class TopicConstant {
 		Divide
 	}
 	public static final String DATE_FORMAT = "EEE MMM dd kk:mm:ss zzz yyyy";
+	public static final String OUTPUT_FILE_DATE_FORMAT = "yyyy-MMdd-HHmmss";
 	public static final int numFeatures = 100;
 
 	@Option(name="-iters",usage="Sets a number of iteration")
