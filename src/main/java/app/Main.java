@@ -2,13 +2,8 @@ package app;
 
 
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.ml.feature.HashingTF;
 import org.apache.spark.ml.feature.IDF;
 import org.apache.spark.ml.feature.IDFModel;
@@ -21,9 +16,6 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.netlib.util.intW;
-
-import scala.tools.nsc.settings.AdvancedScalaSettings.X;
 
 public class Main {
 

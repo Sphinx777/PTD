@@ -5,20 +5,25 @@ import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.Optional;
 import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.api.java.function.VoidFunction;
+import org.apache.spark.ml.feature.RegexTokenizer;
+import org.apache.spark.ml.feature.StopWordsRemover;
+import org.apache.spark.ml.feature.Tokenizer;
 import org.apache.spark.mllib.linalg.Matrix;
 import org.apache.spark.mllib.linalg.SingularValueDecomposition;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.mllib.linalg.distributed.RowMatrix;
+import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
 import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
 import topicDerivation.TopicMain;
 
-import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -224,5 +229,23 @@ public class TopicUtil {
             dbWeighted = 1 + (1.0 / (diffT1T2InDays + diffTnowLeastInDays));
         }
         return dbWeighted;
+    }
+
+    public static void transformToVector(Dataset<Row> tweetInfoJavaRDD,String outputFilePath){
+        Tokenizer tokenizer = new Tokenizer().setInputCol("tweet").setOutputCol("token");
+        RegexTokenizer regexTokenizer = new RegexTokenizer().setInputCol("tweet").setOutputCol("token").setPattern("\\W").setMinTokenLength(3);
+        Dataset<Row> wordsData = regexTokenizer.transform(tweetInfoJavaRDD);
+
+        StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
+        Dataset<Row> filterData = remover.transform(wordsData);
+
+        JavaRDD<String> stringJavaRDD = filterData.select("words").toJavaRDD().map(new Function<Row, String>() {
+            @Override
+            public String call(Row v1) throws Exception {
+                List<Object> rowList = v1.getList(0);
+                return String.join(TopicConstant.SPACE_DELIMITER,Arrays.copyOf(rowList.toArray(),rowList.size(),String[].class));
+            }
+        });
+        stringJavaRDD.saveAsTextFile(outputFilePath);
     }
 }

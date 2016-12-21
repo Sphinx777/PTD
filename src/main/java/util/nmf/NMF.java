@@ -12,7 +12,6 @@ import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.util.LongAccumulator;
-import topicDerivation.TopicMain;
 
 import java.io.Serializable;
 import java.util.ArrayList;

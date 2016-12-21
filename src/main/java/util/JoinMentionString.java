@@ -1,6 +1,5 @@
 package util;
 
-import org.apache.spark.broadcast.Broadcast;
 import vo.TweetInfo;
 import info.debatty.java.stringsimilarity.KShingling;
 import info.debatty.java.stringsimilarity.StringProfile;

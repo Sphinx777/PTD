@@ -8,7 +8,6 @@ import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.DoubleAccumulator;
-import topicDerivation.TopicMain;
 
 import java.util.*;
 

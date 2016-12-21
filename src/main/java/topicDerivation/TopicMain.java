@@ -47,10 +47,16 @@ public class TopicMain {
 			logger.info(e.getMessage());
 		}
 
-		System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+		//for local build
+		//System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 		logger.info("start");
-
-		sparkSession = SparkSession.builder().master("local")
+		StructType schemaTFIDF = new StructType(new StructField[]{
+				new StructField("tweetId", DataTypes.StringType, false, Metadata.empty()),
+				new StructField("tweet", DataTypes.StringType, false, Metadata.empty())
+		});
+		sparkSession = SparkSession.builder()
+									//for local build
+									//.master("local")
 									.appName("TopicDerivation")
 									.config("spark.sql.warehouse.dir","file:///")
 									.getOrCreate();
@@ -64,6 +70,20 @@ public class TopicMain {
 									.add("mentionMen","string").add("userInteraction","string");
 
 		Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(TopicConstant.inputFilePath);
+
+		//test start
+//		logger.info("iters:"+TopicConstant.numIters);
+//		logger.info("factor:"+TopicConstant.numFactors);
+//		logger.info("top:"+TopicConstant.numTopWords);
+//		logger.info("input:"+TopicConstant.inputFilePath);
+//		logger.info("output:"+TopicConstant.outputFilePath);
+//		logger.info("model:"+TopicConstant.model);
+//
+//		if (!TopicConstant.model.trim().equals("")) {
+//			logger.info("The model is not empty~");
+//			return;
+//		}
+		//test end
 
 		SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
 		String outFilePath = TopicConstant.outputFilePath+"_"+sdf.format((Date) broadcastCurrDate.getValue());
@@ -127,9 +147,19 @@ public class TopicMain {
 				return returnStr;
 			}
 		});
-		
+
 		Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
 		Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
+
+		//transform to word vector
+		if(TopicConstant.model.equals("vector")){
+			String vectorFilePath = TopicConstant.outputFilePath+"_wordVector_"+sdf.format((Date) broadcastCurrDate.getValue());
+			Dataset<Row> tweetDS = ds.select("tweetId","tweet");
+			Dataset<Row> filterDS = sparkSession.createDataFrame(tweetDS.toJavaRDD(),schemaTFIDF);
+			TopicUtil.transformToVector(filterDS,vectorFilePath);
+			return;
+		}
+
 		ds.show();
 
 		List<Row> mentionDataset = ds.select("userName","dateString","tweet","tweetId","mentionMen","userInteraction").collectAsList();
@@ -199,10 +229,7 @@ public class TopicMain {
 
 		//normal
 //		List<Row> tfidfDataset = ds.select("tweetId","tweet").collectAsList();
-		StructType schemaTFIDF = new StructType(new StructField[]{
-				new StructField("tweetId", DataTypes.StringType, false, Metadata.empty()),
-				new StructField("tweet", DataTypes.StringType, false, Metadata.empty())
-		});
+
 
 		Dataset<Row> tfidfDataset = ds.select("tweetId","tweet");
 		Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(),schemaTFIDF);
