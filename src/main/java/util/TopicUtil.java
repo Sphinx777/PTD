@@ -8,9 +8,7 @@ import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.api.java.function.VoidFunction;
-import org.apache.spark.ml.feature.RegexTokenizer;
-import org.apache.spark.ml.feature.StopWordsRemover;
-import org.apache.spark.ml.feature.Tokenizer;
+import org.apache.spark.ml.feature.*;
 import org.apache.spark.mllib.linalg.Matrix;
 import org.apache.spark.mllib.linalg.SingularValueDecomposition;
 import org.apache.spark.mllib.linalg.Vector;
@@ -231,7 +229,7 @@ public class TopicUtil {
         return dbWeighted;
     }
 
-    public static void transformToVector(Dataset<Row> tweetInfoJavaRDD,String outputFilePath){
+    public static void transformToVector(Dataset<Row> tweetInfoJavaRDD,String corpusFilePath,String wordVectorFilePath){
         Tokenizer tokenizer = new Tokenizer().setInputCol("tweet").setOutputCol("token");
         RegexTokenizer regexTokenizer = new RegexTokenizer().setInputCol("tweet").setOutputCol("token").setPattern("\\W").setMinTokenLength(3);
         Dataset<Row> wordsData = regexTokenizer.transform(tweetInfoJavaRDD);
@@ -239,13 +237,24 @@ public class TopicUtil {
         StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
         Dataset<Row> filterData = remover.transform(wordsData);
 
-        JavaRDD<String> stringJavaRDD = filterData.select("words").toJavaRDD().map(new Function<Row, String>() {
+        //create corpus
+        JavaRDD<String> outputCorpusStringRDD = filterData.select("words").toJavaRDD().map(new Function<Row, String>() {
             @Override
             public String call(Row v1) throws Exception {
                 List<Object> rowList = v1.getList(0);
                 return String.join(TopicConstant.SPACE_DELIMITER,Arrays.copyOf(rowList.toArray(),rowList.size(),String[].class));
             }
         });
-        stringJavaRDD.saveAsTextFile(outputFilePath);
+        outputCorpusStringRDD.saveAsTextFile(corpusFilePath);
+
+        //create word vector
+        Word2Vec word2Vec = new Word2Vec()
+                .setInputCol("words")
+                .setOutputCol("vector")
+                .setMinCount(0);
+
+        Word2VecModel model = word2Vec.fit(filterData);
+        Dataset<Row> vectorDS = model.transform(filterData);
+        model.getVectors().toJavaRDD().saveAsTextFile(wordVectorFilePath);
     }
 }

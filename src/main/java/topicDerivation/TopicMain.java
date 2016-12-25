@@ -48,7 +48,7 @@ public class TopicMain {
 		}
 
 		//for local build
-		//System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+		System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 		logger.info("start");
 		StructType schemaTFIDF = new StructType(new StructField[]{
 				new StructField("tweetId", DataTypes.StringType, false, Metadata.empty()),
@@ -56,7 +56,7 @@ public class TopicMain {
 		});
 		sparkSession = SparkSession.builder()
 									//for local build
-									//.master("local")
+									.master("local")
 									.appName("TopicDerivation")
 									.config("spark.sql.warehouse.dir","file:///")
 									.getOrCreate();
@@ -153,10 +153,11 @@ public class TopicMain {
 
 		//transform to word vector
 		if(TopicConstant.model.equals("vector")){
-			String vectorFilePath = TopicConstant.outputFilePath+"_wordVector_"+sdf.format((Date) broadcastCurrDate.getValue());
+			String corpusFilePath = TopicConstant.outputFilePath+"_corpus_"+sdf.format((Date) broadcastCurrDate.getValue());
+			String wordVectorFilePath = TopicConstant.outputFilePath+"_wordVector_"+sdf.format((Date) broadcastCurrDate.getValue());
 			Dataset<Row> tweetDS = ds.select("tweetId","tweet");
 			Dataset<Row> filterDS = sparkSession.createDataFrame(tweetDS.toJavaRDD(),schemaTFIDF);
-			TopicUtil.transformToVector(filterDS,vectorFilePath);
+			TopicUtil.transformToVector(filterDS,corpusFilePath,wordVectorFilePath);
 			return;
 		}
 
