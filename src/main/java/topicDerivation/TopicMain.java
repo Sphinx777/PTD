@@ -9,6 +9,7 @@ import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.*;
+import org.apache.spark.sql.execution.columnar.STRING;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -161,19 +162,21 @@ public class TopicMain {
 			return;
 		}
 
-		ds.show();
+		List<String[]> topicWordList = new ArrayList<String[]>();
+		if(!TopicConstant.model.equals("coherence")) {
+			ds.show();
 
-		List<Row> mentionDataset = ds.select("userName","dateString","tweet","tweetId","mentionMen","userInteraction").collectAsList();
-		//compute mention string 1: 1,1,1;1,2,2;
-		//                       2: 2,1,1;2,2,2;
-		JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset,(Date) broadcastCurrDate.getValue()));
-		//put into coordinateMatrix
-		JavaRDD<MatrixEntry> poRDD = computePORDD.flatMap(new GetMentionEntry());
+			List<Row> mentionDataset = ds.select("userName", "dateString", "tweet", "tweetId", "mentionMen", "userInteraction").collectAsList();
+			//compute mention string 1: 1,1,1;1,2,2;
+			//                       2: 2,1,1;2,2,2;
+			JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset, (Date) broadcastCurrDate.getValue()));
+			//put into coordinateMatrix
+			JavaRDD<MatrixEntry> poRDD = computePORDD.flatMap(new GetMentionEntry());
 
-		//normal
-		CoordinateMatrix poMatrix = new CoordinateMatrix(poRDD.rdd());
+			//normal
+			CoordinateMatrix poMatrix = new CoordinateMatrix(poRDD.rdd());
 
-		//test
+			//test
 //		List<Double> matrixEntryList = new ArrayList<Double>();
 //		matrixEntryList.add(5.0);
 //		JavaRDD<Double> tmpMat = sparkSession.createDataset(matrixEntryList,Encoders.DOUBLE()).toJavaRDD();
@@ -204,20 +207,19 @@ public class TopicMain {
 //		nmf interactionNMF = new nmf(interactionMatrix,true);
 //		interactionNMF.buildNMFModel();
 
-		//System.out.println(poMatrix.count());
+			//System.out.println(poMatrix.count());
 
-		//interaction
-		NMF interactionNMF = new NMF(poMatrix,true,sparkSession);
-		interactionNMF.buildNMFModel();
-		CoordinateMatrix W = interactionNMF.getW();
+			//interaction
+			NMF interactionNMF = new NMF(poMatrix, true, sparkSession);
+			interactionNMF.buildNMFModel();
+			CoordinateMatrix W = interactionNMF.getW();
 
-		//test
+			//test
 //		List<Row> data = Arrays.asList(
 //				RowFactory.create(1, "Hi I heard about Spark"),
 //				RowFactory.create(2, "I wish Java could use case classes"),
 //				RowFactory.create(3, "Logistic regression models are neat")
 //		);
-
 
 
 //		StructType schemaTFIDF = new StructType(new StructField[]{
@@ -228,29 +230,29 @@ public class TopicMain {
 
 //		Dataset<Row> sentenceData = sparkSession.createDataFrame(data, schemaTFIDF);
 
-		//normal
+			//normal
 //		List<Row> tfidfDataset = ds.select("tweetId","tweet").collectAsList();
 
 
-		Dataset<Row> tfidfDataset = ds.select("tweetId","tweet");
-		Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(),schemaTFIDF);
+			Dataset<Row> tfidfDataset = ds.select("tweetId", "tweet");
+			Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(), schemaTFIDF);
 
-		//tfidf
-		Broadcast<HashMap<String,String>> brTweetIDMap = sc.broadcast(new HashMap<String,String>());
-		Broadcast<HashMap<String,String>> brTweetWordMap = sc.broadcast(new HashMap<String,String>());
-		Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
-		tweetIDAccumulator.reset();
+			//tfidf
+			Broadcast<HashMap<String, String>> brTweetIDMap = sc.broadcast(new HashMap<String, String>());
+			Broadcast<HashMap<String, String>> brTweetWordMap = sc.broadcast(new HashMap<String, String>());
+			Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
+			tweetIDAccumulator.reset();
 
-		TFIDF tfidf = new TFIDF(sentenceData , brTweetIDMap,brTweetWordMap,brHashSet,sc.sc().longAccumulator());
-		tfidf.buildModel();
-		NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(),false,sparkSession);
-		System.out.println(W.entries().count());
-		tfidfNMF.setW(W);
-		tfidfNMF.buildNMFModel();
-		CoordinateMatrix W1 = tfidfNMF.getW();
-		CoordinateMatrix H1 = tfidfNMF.getH();
+			TFIDF tfidf = new TFIDF(sentenceData, brTweetIDMap, brTweetWordMap, brHashSet, sc.sc().longAccumulator());
+			tfidf.buildModel();
+			NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(), false, sparkSession);
+			System.out.println(W.entries().count());
+			tfidfNMF.setW(W);
+			tfidfNMF.buildNMFModel();
+			CoordinateMatrix W1 = tfidfNMF.getW();
+			CoordinateMatrix H1 = tfidfNMF.getH();
 
-		System.out.println(H1.entries().count());
+			System.out.println(H1.entries().count());
 //		H1.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
 //			@Override
 //			public void call(Vector vector) throws Exception {
@@ -258,43 +260,43 @@ public class TopicMain {
 //			}
 //		});
 
-		JavaRDD<LinkedHashMap<Integer,Double>> cmpRDD = H1.toRowMatrix().rows().toJavaRDD().map(new Function<Vector, LinkedHashMap<Integer, Double>>() {
-			@Override
-			public LinkedHashMap<Integer, Double> call(Vector vector) throws Exception {
-				double[] tmpDBArray = vector.toArray();
-				HashMap<Integer,Double> resultMap= new HashMap<Integer, Double>();
-				for(int i=0;i< tmpDBArray.length;i++){
-					if(tmpDBArray[i]>0){
-						resultMap.put(i,tmpDBArray[i]);
+			JavaRDD<LinkedHashMap<Integer, Double>> cmpRDD = H1.toRowMatrix().rows().toJavaRDD().map(new Function<Vector, LinkedHashMap<Integer, Double>>() {
+				@Override
+				public LinkedHashMap<Integer, Double> call(Vector vector) throws Exception {
+					double[] tmpDBArray = vector.toArray();
+					HashMap<Integer, Double> resultMap = new HashMap<Integer, Double>();
+					for (int i = 0; i < tmpDBArray.length; i++) {
+						if (tmpDBArray[i] > 0) {
+							resultMap.put(i, tmpDBArray[i]);
+						}
 					}
-				}
-				List<Map.Entry<Integer, Double>> list =
-						new LinkedList<Map.Entry<Integer, Double>>( resultMap.entrySet() );
-				Collections.sort( list, new Comparator<Map.Entry<Integer, Double>>()
-				{
-					@Override
-					public int compare( Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2 )
-					{
-						return ( o2.getValue()  ).compareTo( o1.getValue());
+					List<Map.Entry<Integer, Double>> list =
+							new LinkedList<Map.Entry<Integer, Double>>(resultMap.entrySet());
+					Collections.sort(list, new Comparator<Map.Entry<Integer, Double>>() {
+						@Override
+						public int compare(Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2) {
+							return (o2.getValue()).compareTo(o1.getValue());
+						}
+					});
+
+					LinkedHashMap<Integer, Double> result = new LinkedHashMap<Integer, Double>();
+					for (Map.Entry<Integer, Double> entry : list) {
+						result.put(entry.getKey(), entry.getValue());
 					}
-				} );
-
-				LinkedHashMap<Integer, Double> result = new LinkedHashMap<Integer, Double>();
-				for (Map.Entry<Integer, Double> entry : list)
-				{
-					result.put( entry.getKey(), entry.getValue() );
+					return result;
 				}
-				return result;
-			}
-		});
+			});
 
-		System.out.println(cmpRDD.count());
-		JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap()));
-		System.out.println(jsonRDD.count());
-		jsonRDD.saveAsTextFile(outFilePath);
+			System.out.println(cmpRDD.count());
+			JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap()));
+			System.out.println(jsonRDD.count());
+			jsonRDD.saveAsTextFile(outFilePath);
+			topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap())).collect();
+		}else{
+			topicWordList = TopicUtil.readTopicWordList(TopicConstant.coherenceFilePath);
+		}
 
 		//get the topic coherence value
-		List<String[]> topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap())).collect();
 		JavaRDD<String> tweetStrRDD = tweetJavaRDD.map(new Function<TweetInfo, String>() {
 			@Override
 			public String call(TweetInfo v1) throws Exception {

@@ -22,6 +22,8 @@ import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
 import topicDerivation.TopicMain;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -256,5 +258,24 @@ public class TopicUtil {
         Word2VecModel model = word2Vec.fit(filterData);
         Dataset<Row> vectorDS = model.transform(filterData);
         model.getVectors().toJavaRDD().saveAsTextFile(wordVectorFilePath);
+    }
+
+    public static List<String[]> readTopicWordList(String inputTopicWordPath){
+        List<String[]> topicWordList = new ArrayList<String[]>();
+        BufferedReader br = null;
+        try {
+            br = new BufferedReader(new FileReader(inputTopicWordPath));
+            String line;
+            while ((line=br.readLine()) != null) {
+                if(line.trim().length()==0){
+                    continue;
+                }
+                topicWordList.add(line.split("\\s+"));
+            }
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
+
+        return topicWordList;
     }
 }

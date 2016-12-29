@@ -29,6 +29,9 @@ public class TopicConstant {
 	@Option(name="-output",usage="Sets a path of output")
 	public static String outputFilePath;
 
-	@Option(name="-model",usage="Sets a model(DTTD , intJNMF)")
+	@Option(name="-model",usage="Sets a model(DTTD , intJNMF , vector , coherence)")
 	public static String model;
+
+	@Option(name="-cohInput",usage="Sets a coherence file input")
+	public static String coherenceFilePath;
 }

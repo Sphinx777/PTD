@@ -94,6 +94,7 @@ public class MeasureUtil {
 
                 System.out.println("dbSum:"+dbSum);
                 System.out.println("wordCntValue:"+Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue())));
+                System.out.println("log value:"+Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue())));
                 dbSum += Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue()));
             }
         }
