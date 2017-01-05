@@ -13,12 +13,13 @@ import java.util.List;
 public class JoinMentionString implements Function<TweetInfo, String>{
 	List<Row> tmpMentionList;
 	Date currDate;
-
+	private String model;
 	//Word2Vec word2Vec;
 	
-	public JoinMentionString(List<Row> strings , Date paraCurrDate){
+	public JoinMentionString(List<Row> strings , Date paraCurrDate , String paraModel){
 		tmpMentionList = strings;
 		currDate = paraCurrDate;
+		model = paraModel;
 		//word2Vec = new Word2Vec.Builder().build();
 	}
 	
@@ -58,7 +59,7 @@ public class JoinMentionString implements Function<TweetInfo, String>{
 		        dbValue += dbCosValue;
 
 				//weighted by time-factor
-				if(TopicConstant.model.trim().toUpperCase().equals("DTTD")) {
+				if(model.trim().toUpperCase().equals("DTTD")) {
 					dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(), row.getAs("dateString").toString(), currDate);
 				}
 

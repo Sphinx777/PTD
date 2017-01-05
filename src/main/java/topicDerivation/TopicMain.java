@@ -41,7 +41,7 @@ public class TopicMain {
 		try {
 			parser.parseArgument(args);
 
-            if(!TopicConstant.model.equals("")) {
+            if(!cmdArgs.model.equals("")) {
                 //for local build
                 //System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
                 logger.info("start");
@@ -67,10 +67,10 @@ public class TopicMain {
                         .add("mentionMen", "string").add("userInteraction", "string");
 
                 //read csv file to dataSet
-                Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(TopicConstant.inputFilePath);
+                Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(cmdArgs.inputFilePath);
 
                 SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
-                String outFilePath = TopicConstant.outputFilePath + "_" + sdf.format((Date) broadcastCurrDate.getValue());
+                String outFilePath = cmdArgs.outputFilePath + "_" + sdf.format((Date) broadcastCurrDate.getValue());
                 double maxCoherenceValue = -Double.MAX_VALUE;
                 List<String[]> topicWordList = new ArrayList<String[]>();
 
@@ -130,9 +130,9 @@ public class TopicMain {
                 Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
 
                 //transform to word vector
-                if (TopicConstant.model.equals("vector")) {
-                    String corpusFilePath = TopicConstant.outputFilePath + "_corpus_" + sdf.format((Date) broadcastCurrDate.getValue());
-                    String wordVectorFilePath = TopicConstant.outputFilePath + "_wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
+                if (cmdArgs.model.equals("vector")) {
+                    String corpusFilePath = cmdArgs.outputFilePath + "_corpus_" + sdf.format((Date) broadcastCurrDate.getValue());
+                    String wordVectorFilePath = cmdArgs.outputFilePath + "_wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
                     Dataset<Row> tweetDS = ds.select("tweetId", "tweet");
                     Dataset<Row> filterDS = sparkSession.createDataFrame(tweetDS.toJavaRDD(), schemaTFIDF);
                     TopicUtil.transformToVector(filterDS, corpusFilePath, wordVectorFilePath);
@@ -140,14 +140,14 @@ public class TopicMain {
                 }
 
                 //compute topic word list
-                if (!TopicConstant.model.equals("coherence")) {
+                if (!cmdArgs.model.equals("coherence")) {
                     //DTTD , intJNMF...etc
                     ds.show();
 
                     List<Row> mentionDataset = ds.select("userName", "dateString", "tweet", "tweetId", "mentionMen", "userInteraction").collectAsList();
 
                     //compute mention string
-                    JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset, (Date) broadcastCurrDate.getValue()));
+                    JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset, (Date) broadcastCurrDate.getValue() , cmdArgs.model));
                     //put into coordinateMatrix
                     JavaRDD<MatrixEntry> poRDD = computePORDD.flatMap(new GetMentionEntry());
 
@@ -155,7 +155,7 @@ public class TopicMain {
                     CoordinateMatrix poMatrix = new CoordinateMatrix(poRDD.rdd());
 
                     //interaction
-                    NMF interactionNMF = new NMF(poMatrix, true, sparkSession);
+                    NMF interactionNMF = new NMF(poMatrix, true, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
                     interactionNMF.buildNMFModel();
                     CoordinateMatrix W = interactionNMF.getW();
 
@@ -170,7 +170,7 @@ public class TopicMain {
 
                     TFIDF tfidf = new TFIDF(sentenceData, brTweetIDMap, brTweetWordMap, brHashSet, sc.sc().longAccumulator());
                     tfidf.buildModel();
-                    NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(), false, sparkSession);
+                    NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
                     System.out.println(W.entries().count());
                     tfidfNMF.setW(W);
                     tfidfNMF.buildNMFModel();
@@ -207,13 +207,13 @@ public class TopicMain {
                     });
 
                     System.out.println(cmpRDD.count());
-                    JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap()));
+                    JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap(),cmdArgs.numTopWords));
                     System.out.println(jsonRDD.count());
                     jsonRDD.saveAsTextFile(outFilePath);
-                    topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap())).collect();
+                    topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords)).collect();
                 } else {
                     //model = "coherence"
-                    topicWordList = TopicUtil.readTopicWordList(TopicConstant.coherenceFilePath);
+                    topicWordList = TopicUtil.readTopicWordList(cmdArgs.coherenceFilePath);
                 }
 
                 //get the topic coherence value
@@ -235,8 +235,8 @@ public class TopicMain {
                     }
                     dbAccumulator.add(tmpCoherenceValue);
                 }
-                System.out.println("Max Topic coherence value of top " + TopicConstant.numTopWords + " words:" + maxCoherenceValue);
-                System.out.println("Average topic coherence value of top " + TopicConstant.numTopWords + " words:" + dbAccumulator.value() / (double) topicWordList.size());
+                System.out.println("Max Topic coherence value of top " + cmdArgs.numTopWords + " words:" + maxCoherenceValue);
+                System.out.println("Average topic coherence value of top " + cmdArgs.numTopWords + " words:" + dbAccumulator.value() / (double) topicWordList.size());
 
                 //Object vs = poMatrix.toRowMatrix().rows().take(1);
                 //Encoders.STRING()

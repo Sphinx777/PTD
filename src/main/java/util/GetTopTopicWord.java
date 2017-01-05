@@ -10,8 +10,10 @@ import java.util.*;
 public class GetTopTopicWord implements Function<LinkedHashMap<Integer,Double>,String[]> {
     //private final int intTopWordCnt = 10;
     private HashMap<String,String> tweetIDMap = new HashMap<String,String>();
-    public  GetTopTopicWord(HashMap<String,String> srcMap){
+    private int numTopWords;
+    public  GetTopTopicWord(HashMap<String,String> srcMap , int paraNumTopWords){
         tweetIDMap = srcMap;
+        numTopWords = paraNumTopWords;
     }
 
     public String[] call(LinkedHashMap<Integer,Double> map) throws Exception {
@@ -31,7 +33,7 @@ public class GetTopTopicWord implements Function<LinkedHashMap<Integer,Double>,S
         }
         System.out.println(stringArrayList.toArray());
         //stop condition 2--copy range of  array
-        String[] resultArray = Arrays.copyOfRange(stringArrayList.toArray(new String[stringArrayList.size()]),0,TopicConstant.numTopWords);
+        String[] resultArray = Arrays.copyOfRange(stringArrayList.toArray(new String[stringArrayList.size()]),0,numTopWords);
         return resultArray;
     }
 }

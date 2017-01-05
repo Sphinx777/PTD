@@ -12,9 +12,11 @@ import java.util.*;
 //map       topic1--word1:value1;word2:value2;
 public class WriteToJSON implements Function<LinkedHashMap<Integer,Double>,String>{
     private HashMap<String,String> tweetIDMap = new HashMap<String,String>();
+    private int numTopWords;
 
-    public  WriteToJSON(HashMap<String,String> srcMap){
+    public  WriteToJSON(HashMap<String,String> srcMap , int paraNumTopWords){
         tweetIDMap = srcMap;
+        numTopWords = paraNumTopWords;
     }
 
     public String call(LinkedHashMap<Integer,Double> map) throws Exception {
@@ -30,7 +32,7 @@ public class WriteToJSON implements Function<LinkedHashMap<Integer,Double>,Strin
             resultMap.put(tweetIDMap.get(entry.getKey().toString()),entry.getValue());
 
             //set the top topic word limit
-            if(resultMap.size()>= TopicConstant.numTopWords){
+            if(resultMap.size()>= numTopWords){
                 break;
             }
         }
