@@ -55,6 +55,7 @@ public class TopicMain {
                         //for local build
                         //.master("local")
                         .appName("TopicDerivation")
+                        .config("spark.executor.heartbeatInterval","300000")
                         .config("spark.sql.warehouse.dir", "file:///")
                         .getOrCreate();
 
@@ -80,12 +81,14 @@ public class TopicMain {
                 //add accumulator
                 LongAccumulator tweetIDAccumulator = sc.sc().longAccumulator();
 
+                logger.info("compute the mentionMen!");
                 //set custom javaRDD and compute the mentionMen
                 JavaRDD<TweetInfo> tweetJavaRDD = currDataset.javaRDD().map(new Function<Row, TweetInfo>() {
                     public TweetInfo call(Row row) throws Exception {
                         TweetInfo tweet = new TweetInfo();
                         tweetIDAccumulator.add(1);
                         tweet.setTweetId(tweetIDAccumulator.value().toString());
+                        logger.info("TweetId:"+tweet.getTweetId());
                         tweet.setDateString(row.getAs("date").toString());
                         tweet.setUserName(row.getAs("userName").toString());
                         tweet.setTweet(row.getAs("tweet").toString());
@@ -131,6 +134,7 @@ public class TopicMain {
 
                 //transform to word vector
                 if (cmdArgs.model.equals("vector")) {
+                    logger.info("compute vector!");
                     String corpusFilePath = cmdArgs.outputFilePath + "_corpus_" + sdf.format((Date) broadcastCurrDate.getValue());
                     String wordVectorFilePath = cmdArgs.outputFilePath + "_wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
                     Dataset<Row> tweetDS = ds.select("tweetId", "tweet");
@@ -141,6 +145,8 @@ public class TopicMain {
 
                 //compute topic word list
                 if (!cmdArgs.model.equals("coherence")) {
+                    logger.info("compute coherence start!");
+
                     //DTTD , intJNMF...etc
                     ds.show();
 
@@ -148,14 +154,22 @@ public class TopicMain {
 
                     //compute mention string
                     JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset, (Date) broadcastCurrDate.getValue() , cmdArgs.model));
+
+                    logger.info("set mention entry!");
+
                     //put into coordinateMatrix
                     JavaRDD<MatrixEntry> poRDD = computePORDD.flatMap(new GetMentionEntry());
+
+                    logger.info("put coordinate matrix!");
 
                     //normal
                     CoordinateMatrix poMatrix = new CoordinateMatrix(poRDD.rdd());
 
+                    logger.info("compute interaction NMF!");
                     //interaction
                     NMF interactionNMF = new NMF(poMatrix, true, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
+
+                    logger.info("build NMF model!");
                     interactionNMF.buildNMFModel();
                     CoordinateMatrix W = interactionNMF.getW();
 
@@ -169,16 +183,21 @@ public class TopicMain {
                     tweetIDAccumulator.reset();
 
                     TFIDF tfidf = new TFIDF(sentenceData, brTweetIDMap, brTweetWordMap, brHashSet, sc.sc().longAccumulator());
+
+                    logger.info("build tfidf model!");
                     tfidf.buildModel();
                     NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
                     System.out.println(W.entries().count());
                     tfidfNMF.setW(W);
+
+                    logger.info("build tfidf NMF model!");
                     tfidfNMF.buildNMFModel();
                     CoordinateMatrix W1 = tfidfNMF.getW();
                     CoordinateMatrix H1 = tfidfNMF.getH();
 
                     System.out.println(H1.entries().count());
 
+                    logger.info("order NMF score!");
                     JavaRDD<LinkedHashMap<Integer, Double>> cmpRDD = H1.toRowMatrix().rows().toJavaRDD().map(new Function<Vector, LinkedHashMap<Integer, Double>>() {
                         @Override
                         public LinkedHashMap<Integer, Double> call(Vector vector) throws Exception {
@@ -207,12 +226,16 @@ public class TopicMain {
                     });
 
                     System.out.println(cmpRDD.count());
+                    logger.info("transform to JSON!");
                     JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap(),cmdArgs.numTopWords));
                     System.out.println(jsonRDD.count());
                     jsonRDD.saveAsTextFile(outFilePath);
+
+                    logger.info("get top topic word list!");
                     topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords)).collect();
                 } else {
                     //model = "coherence"
+                    logger.info("read topic word list!");
                     topicWordList = TopicUtil.readTopicWordList(cmdArgs.coherenceFilePath);
                 }
 
@@ -228,6 +251,7 @@ public class TopicMain {
                 double tmpCoherenceValue;
                 Broadcast<HashMap<String, Integer>> brWordCntMap = sc.broadcast(new HashMap<String, Integer>());
 
+                logger.info("compute the topic coherence value!");
                 for (String[] strings : topicWordList) {
                     tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap);
                     if (Double.compare(tmpCoherenceValue, maxCoherenceValue) > 0) {
