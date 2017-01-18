@@ -1,5 +1,6 @@
 package util.tfidf;
 
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
@@ -12,6 +13,7 @@ import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.util.LongAccumulator;
+import scala.Tuple2;
 
 import java.io.Serializable;
 import java.util.*;
@@ -75,31 +77,59 @@ public class TFIDF implements Serializable{
 
 		org.apache.spark.mllib.feature.IDF idfMllib = new org.apache.spark.mllib.feature.IDF();
 		JavaRDD<org.apache.spark.mllib.linalg.Vector> tfIdfs = idfMllib.fit(termFreqs).transform(termFreqs);
-		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
-															   @Override
-															   public Iterator<MatrixEntry> call(org.apache.spark.mllib.linalg.Vector vector) throws Exception {
-																   List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-																   long matrixIdx=0;
-																   IDAccumulator.add(1);
-																   for (int i : vector.toSparse().indices()) {
-																	   if(brTweetWordMap.getValue().containsValue(brTweetIDMap.getValue().get(String.valueOf(i)))==false){
-																		   matrixIdx = Long.valueOf(brTweetWordMap.getValue().size()+1);
-																		   brTweetWordMap.getValue().put(String.valueOf(matrixIdx) , brTweetIDMap.getValue().get(String.valueOf(i)));
-																	   }else{
-																		   Iterator<Map.Entry<String,String>> iter =brTweetWordMap.getValue().entrySet().iterator();
-																		   while (iter.hasNext()){
-																			   Map.Entry<String,String> entry = iter.next();
-																			   if(entry.getValue().equals(brTweetIDMap.getValue().get(String.valueOf(i)))){
-																				   matrixIdx = Long.valueOf(entry.getKey());
-																				   break;
-																			   }
-																		   }
-																	   }
-																	   arrayList.add(new MatrixEntry(Double.valueOf(IDAccumulator.value().toString()).longValue(), matrixIdx, vector.toArray()[i]));
-																   }
-																   return arrayList.iterator();
-															   }
-														   });
+
+		JavaPairRDD<org.apache.spark.mllib.linalg.Vector,Long> tfidfPairRDD = tfIdfs.zipWithIndex();
+
+		JavaRDD<MatrixEntry> entryJavaRDD = tfidfPairRDD.flatMap(new FlatMapFunction<Tuple2<org.apache.spark.mllib.linalg.Vector, Long>, MatrixEntry>() {
+			@Override
+			public Iterator<MatrixEntry> call(Tuple2<org.apache.spark.mllib.linalg.Vector, Long> vectorLongTuple2) throws Exception {
+				List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+				long matrixIdx=0;
+				for (int i : vectorLongTuple2._1().toSparse().indices()) {
+					if(brTweetWordMap.getValue().containsValue(brTweetIDMap.getValue().get(String.valueOf(i)))==false){
+						matrixIdx = Long.valueOf(brTweetWordMap.getValue().size()+1);
+						brTweetWordMap.getValue().put(String.valueOf(matrixIdx) , brTweetIDMap.getValue().get(String.valueOf(i)));
+					}else{
+						Iterator<Map.Entry<String,String>> iter =brTweetWordMap.getValue().entrySet().iterator();
+						while (iter.hasNext()){
+							Map.Entry<String,String> entry = iter.next();
+							if(entry.getValue().equals(brTweetIDMap.getValue().get(String.valueOf(i)))){
+								matrixIdx = Long.valueOf(entry.getKey());
+								break;
+							}
+						}
+					}
+					arrayList.add(new MatrixEntry(vectorLongTuple2._2().longValue()+1, matrixIdx, vectorLongTuple2._1().toArray()[i]));
+				}
+				return arrayList.iterator();
+			}
+		});
+
+//		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
+//															   @Override
+//															   public Iterator<MatrixEntry> call(org.apache.spark.mllib.linalg.Vector vector) throws Exception {
+//																   List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+//																   long matrixIdx=0;
+//																   IDAccumulator.add(1);
+//																   for (int i : vector.toSparse().indices()) {
+//																	   if(brTweetWordMap.getValue().containsValue(brTweetIDMap.getValue().get(String.valueOf(i)))==false){
+//																		   matrixIdx = Long.valueOf(brTweetWordMap.getValue().size()+1);
+//																		   brTweetWordMap.getValue().put(String.valueOf(matrixIdx) , brTweetIDMap.getValue().get(String.valueOf(i)));
+//																	   }else{
+//																		   Iterator<Map.Entry<String,String>> iter =brTweetWordMap.getValue().entrySet().iterator();
+//																		   while (iter.hasNext()){
+//																			   Map.Entry<String,String> entry = iter.next();
+//																			   if(entry.getValue().equals(brTweetIDMap.getValue().get(String.valueOf(i)))){
+//																				   matrixIdx = Long.valueOf(entry.getKey());
+//																				   break;
+//																			   }
+//																		   }
+//																	   }
+//																	   arrayList.add(new MatrixEntry(Double.valueOf(IDAccumulator.value().toString()).longValue(), matrixIdx, vector.toArray()[i]));
+//																   }
+//																   return arrayList.iterator();
+//															   }
+//														   });
 		tweetIDMap = brTweetWordMap.getValue();
 
 		entryJavaRDD.collect();
