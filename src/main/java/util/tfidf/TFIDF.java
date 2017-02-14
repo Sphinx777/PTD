@@ -2,23 +2,28 @@ package util.tfidf;
 
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
-import org.apache.spark.ml.feature.*;
-import org.apache.spark.ml.linalg.Vector;
+import org.apache.spark.ml.feature.RegexTokenizer;
+import org.apache.spark.ml.feature.StopWordsRemover;
+import org.apache.spark.ml.feature.Tokenizer;
+import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.util.LongAccumulator;
+import org.apache.spark.util.CollectionAccumulator;
 import scala.Tuple2;
 
 import java.io.Serializable;
 import java.util.*;
 
 public class TFIDF implements Serializable{
+	static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(TFIDF.class.getName());
+
 	private Dataset<Row> tweetDataset;
 	private Dataset<Row> tfidfDataSet;
 	private CoordinateMatrix CoorMatOfTFIDF;
@@ -26,18 +31,20 @@ public class TFIDF implements Serializable{
 	public Dataset<Row> getTfidfDataSet() {
 		return tfidfDataSet;
 	}
-	private Broadcast<HashMap<String,String>> brTweetIDMap;
-	private Broadcast<HashMap<String,String>> brTweetWordMap;
-	private Broadcast<HashSet<String>> brHashSet;
-	private LongAccumulator IDAccumulator;
 
-	public TFIDF(Dataset<Row> rdd , Broadcast<HashMap<String,String>> paraTweetIDMap, Broadcast<HashMap<String,String>> paraTweetWordMap ,
-				 Broadcast<HashSet<String>> paraHashSet , LongAccumulator paraTweetIDAccumulator){
+	private static Broadcast<HashMap<String,String>> brTweetIDMap;
+
+	private static Broadcast<HashMap<String,String>> brTweetWordMap;
+
+	private static JavaSparkContext sparkContext;
+
+	private static CollectionAccumulator<String> tweetAccumulator;
+
+	public TFIDF(Dataset<Row> rdd , JavaSparkContext paraSparkContext ,
+				CollectionAccumulator<String> paraTweetAccumulator){
 		tweetDataset = rdd;
-		brTweetIDMap = paraTweetIDMap;
-		brTweetWordMap = paraTweetWordMap;
-		brHashSet = paraHashSet;
-		IDAccumulator = paraTweetIDAccumulator;
+        sparkContext = paraSparkContext;
+		tweetAccumulator = paraTweetAccumulator;
 	}
 	
 	//tweet:original message
@@ -50,13 +57,14 @@ public class TFIDF implements Serializable{
 		//tokenizer version
 		//Dataset<Row> wordsData = tokenizer.transform(tweetDataset);
 		//regexTokenizer version
+
 		Dataset<Row> wordsData = regexTokenizer.transform(tweetDataset);
 
 		StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
 		Dataset<Row> filterData = remover.transform(wordsData);
 
-		//get tokenHashSet
-		filterData.select("words").toJavaRDD().foreach(new filterRowFunction(brHashSet));
+		//get wordAccumulator
+		filterData.select("words").toJavaRDD().foreach(new filterRowFunction(tweetAccumulator));
 
 		org.apache.spark.mllib.feature.HashingTF tf = new org.apache.spark.mllib.feature.HashingTF();
 		//tfidf for ml start
@@ -69,69 +77,70 @@ public class TFIDF implements Serializable{
 			}
 		});
 
+		HashSet<String> tweetHashSet = new HashSet<String>(tweetAccumulator.value());
+
 		JavaRDD<org.apache.spark.mllib.linalg.Vector> termFreqs = tf.transform(listJavaRDD);
-		for(Object obj:brHashSet.getValue().toArray()){
+		long idxCnt = 0;
+		logger.info("tweetHashSet.count:"+tweetHashSet.size());
+        HashMap<String,String> tmpTweetIDMap = new HashMap<>();
+        HashMap<String,String> tweetWordMap = new HashMap<>();
+		for(Object obj:tweetHashSet.toArray()){
 			System.out.println("index:"+tf.indexOf(obj.toString())+",word:"+obj.toString());
-			brTweetIDMap.getValue().put(String.valueOf(tf.indexOf(obj.toString())), obj.toString());
+			logger.info("index:"+tf.indexOf(obj.toString())+",word:"+obj.toString());
+            tmpTweetIDMap.put(String.valueOf(tf.indexOf(obj.toString())), obj.toString()); //ok to broadcast
+			if(!tweetWordMap.containsValue(obj.toString())){
+				idxCnt = Long.valueOf(tweetWordMap.size()+1);
+                tweetWordMap.put(String.valueOf(idxCnt) , obj.toString());
+			}
 		}
+
+		brTweetIDMap = sparkContext.broadcast(tmpTweetIDMap);
+        brTweetWordMap = sparkContext.broadcast(tweetWordMap);
 
 		org.apache.spark.mllib.feature.IDF idfMllib = new org.apache.spark.mllib.feature.IDF();
 		JavaRDD<org.apache.spark.mllib.linalg.Vector> tfIdfs = idfMllib.fit(termFreqs).transform(termFreqs);
 
 		JavaPairRDD<org.apache.spark.mllib.linalg.Vector,Long> tfidfPairRDD = tfIdfs.zipWithIndex();
-
-		JavaRDD<MatrixEntry> entryJavaRDD = tfidfPairRDD.flatMap(new FlatMapFunction<Tuple2<org.apache.spark.mllib.linalg.Vector, Long>, MatrixEntry>() {
+		tfidfPairRDD.foreach(new VoidFunction<Tuple2<org.apache.spark.mllib.linalg.Vector, Long>>() {
 			@Override
-			public Iterator<MatrixEntry> call(Tuple2<org.apache.spark.mllib.linalg.Vector, Long> vectorLongTuple2) throws Exception {
-				List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-				long matrixIdx=0;
-				for (int i : vectorLongTuple2._1().toSparse().indices()) {
-					if(brTweetWordMap.getValue().containsValue(brTweetIDMap.getValue().get(String.valueOf(i)))==false){
-						matrixIdx = Long.valueOf(brTweetWordMap.getValue().size()+1);
-						brTweetWordMap.getValue().put(String.valueOf(matrixIdx) , brTweetIDMap.getValue().get(String.valueOf(i)));
-					}else{
-						Iterator<Map.Entry<String,String>> iter =brTweetWordMap.getValue().entrySet().iterator();
-						while (iter.hasNext()){
-							Map.Entry<String,String> entry = iter.next();
-							if(entry.getValue().equals(brTweetIDMap.getValue().get(String.valueOf(i)))){
-								matrixIdx = Long.valueOf(entry.getKey());
-								break;
-							}
-						}
-					}
-					arrayList.add(new MatrixEntry(vectorLongTuple2._2().longValue()+1, matrixIdx, vectorLongTuple2._1().toArray()[i]));
-				}
-				return arrayList.iterator();
+			public void call(Tuple2<Vector, Long> vectorLongTuple2) throws Exception {
+                System.out.println("vectorLongTuple2 for collect:"+vectorLongTuple2._1()+","+vectorLongTuple2._2());
 			}
 		});
+		//tfidfPairRDD.collect();
+		JavaRDD<MatrixEntry> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
 
 //		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
 //															   @Override
 //															   public Iterator<MatrixEntry> call(org.apache.spark.mllib.linalg.Vector vector) throws Exception {
 //																   List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
 //																   long matrixIdx=0;
-//																   IDAccumulator.add(1);
+//																   tweetAccumulator.add(1);
 //																   for (int i : vector.toSparse().indices()) {
-//																	   if(brTweetWordMap.getValue().containsValue(brTweetIDMap.getValue().get(String.valueOf(i)))==false){
-//																		   matrixIdx = Long.valueOf(brTweetWordMap.getValue().size()+1);
-//																		   brTweetWordMap.getValue().put(String.valueOf(matrixIdx) , brTweetIDMap.getValue().get(String.valueOf(i)));
+//																	   if(tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))==false){
+//																		   matrixIdx = Long.valueOf(tweetWordMapBroadCast.getValue().size()+1);
+//																		   tweetWordMapBroadCast.getValue().put(String.valueOf(matrixIdx) , tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
 //																	   }else{
-//																		   Iterator<Map.Entry<String,String>> iter =brTweetWordMap.getValue().entrySet().iterator();
+//																		   Iterator<Map.Entry<String,String>> iter =tweetWordMapBroadCast.getValue().entrySet().iterator();
 //																		   while (iter.hasNext()){
 //																			   Map.Entry<String,String> entry = iter.next();
-//																			   if(entry.getValue().equals(brTweetIDMap.getValue().get(String.valueOf(i)))){
+//																			   if(entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))){
 //																				   matrixIdx = Long.valueOf(entry.getKey());
 //																				   break;
 //																			   }
 //																		   }
 //																	   }
-//																	   arrayList.add(new MatrixEntry(Double.valueOf(IDAccumulator.value().toString()).longValue(), matrixIdx, vector.toArray()[i]));
+//																	   arrayList.add(new MatrixEntry(Double.valueOf(tweetAccumulator.value().toString()).longValue(), matrixIdx, vector.toArray()[i]));
 //																   }
 //																   return arrayList.iterator();
 //															   }
 //														   });
 		tweetIDMap = brTweetWordMap.getValue();
 
+		for(Map.Entry<String,String> entry:tweetIDMap.entrySet()){
+			System.out.println("tweetIDMap["+entry.getKey()+"]:"+entry.getValue());
+			logger.info("tweetIDMap["+entry.getKey()+"]:"+entry.getValue());
+		}
 		entryJavaRDD.collect();
 
 		//tfidf for ml end
@@ -149,7 +158,7 @@ public class TFIDF implements Serializable{
 //		IDFModel idfModel = idf.fit(featurizedData);
 //		Dataset<Row> rescaledData = idfModel.transform(featurizedData);
 //
-//		rescaledData.select("tweetId","words","features","rawFeatures").toJavaRDD().foreach(new RowVoidFunction(brTweetIDMap));
+//		rescaledData.select("tweetId","words","features","rawFeatures").toJavaRDD().foreach(new RowVoidFunction(tweetIDMapBroadCast));
 //
 //
 //		tfidfDataSet = rescaledData;
@@ -205,7 +214,7 @@ public class TFIDF implements Serializable{
 //			}
 //		});
 		CoorMatOfTFIDF = new CoordinateMatrix(entryJavaRDD.rdd());
-		System.out.println(CoorMatOfTFIDF.entries().count());
+		//System.out.println(CoorMatOfTFIDF.entries().count());
 	}
 	//x:tweet Id , y:term id(features--vector) , value:tfidf(features--vector)
 	public CoordinateMatrix getCoorMatOfTFIDF(){
@@ -215,31 +224,31 @@ public class TFIDF implements Serializable{
 		return tweetIDMap;
 	}
 
-	private class RowVoidFunction implements VoidFunction<Row> {
-		private Broadcast<HashMap<String,String>> tweetIDMap;
-
-		public RowVoidFunction(Broadcast<HashMap<String,String>> srcMap) {
-			tweetIDMap = srcMap;
-		}
-
-		@Override
-        public void call(Row row) throws Exception {
-            String id = row.getAs("tweetId");
-            Vector feature = row.getAs("features");
-            LinkedList<Object> list = new LinkedList<Object>(row.getList(1));
-            for(int idx:feature.toSparse().indices()){
-                System.out.println("id:"+idx+" , value:"+feature.toArray()[idx]);
-                String wrd = list.poll().toString();
-                tweetIDMap.getValue().put(String.valueOf(idx),wrd);
-            }
-        }
-	}
+//	private class RowVoidFunction implements VoidFunction<Row> {
+//		private Broadcast<HashMap<String,String>> tweetIDMap;
+//
+//		public RowVoidFunction(Broadcast<HashMap<String,String>> srcMap) {
+//			tweetIDMap = srcMap;
+//		}
+//
+//		@Override
+//        public void call(Row row) throws Exception {
+//            String id = row.getAs("tweetId");
+//            Vector feature = row.getAs("features");
+//            LinkedList<Object> list = new LinkedList<Object>(row.getList(1));
+//            for(int idx:feature.toSparse().indices()){
+//                System.out.println("id:"+idx+" , value:"+feature.toArray()[idx]);
+//                String wrd = list.poll().toString();
+//                tweetIDMap.getValue().put(String.valueOf(idx),wrd);
+//            }
+//        }
+//	}
 
 	private class filterRowFunction implements VoidFunction<Row>{
-		private Broadcast<HashSet<String>> tokenHashSet;
+		private CollectionAccumulator<String> wordAccumulator;
 
-		public filterRowFunction(Broadcast<HashSet<String>> paraBr){
-			tokenHashSet = paraBr;
+		public filterRowFunction(CollectionAccumulator<String> paraAccu){
+			wordAccumulator = paraAccu;
 		}
 
 		@Override
@@ -247,8 +256,54 @@ public class TFIDF implements Serializable{
 			List<Object> rowList = row.getList(0);
 			for(Object obj:rowList){
 				String wrd = obj.toString();
-				tokenHashSet.getValue().add(wrd);
+				wordAccumulator.add(wrd);
 			}
 		}
 	}
+
+    private class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<Vector, Long>, MatrixEntry> {
+        private Broadcast<HashMap<String,String>> tweetIDMapBroadCast;
+        private Broadcast<HashMap<String,String>> tweetWordMapBroadCast;
+
+        public Tuple2MatrixEntryFlatMapFunction(Broadcast<HashMap<String,String>> paraTweetIDMap , Broadcast<HashMap<String,String>> paraTweetWordMap){
+            tweetIDMapBroadCast = paraTweetIDMap;
+            tweetWordMapBroadCast = paraTweetWordMap;
+        }
+
+        @Override
+        public Iterator<MatrixEntry> call(Tuple2<Vector, Long> vectorLongTuple2) throws Exception {
+            List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+            long matrixIdx = 0;
+            logger.info("vectorLongTuple2:" + vectorLongTuple2._1() + "," + vectorLongTuple2._2());
+            System.out.println("vectorLongTuple2:" + vectorLongTuple2._1() + "," + vectorLongTuple2._2());
+            for (int i : vectorLongTuple2._1().toSparse().indices()) {
+                logger.info("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+                logger.info("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+                logger.info("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+
+                System.out.println("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+                System.out.println("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+                System.out.println("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+                if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {
+                    System.out.println("tweetWordMapBroadCast contains no value error!");
+                    logger.info("tweetWordMapBroadCast contains no value error!");
+                    //matrixIdx = Long.valueOf(tweetWordMapBroadCast.getValue().size()+1);
+                    //tweetWordMapBroadCast.getValue().put(String.valueOf(matrixIdx) , tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+                } else {
+                    Iterator<Map.Entry<String, String>> iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
+                    while (iter.hasNext()) {
+                        Map.Entry<String, String> entry = iter.next();
+                        if (entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))) {
+                            matrixIdx = Long.valueOf(entry.getKey());
+                            break;
+                        }
+                    }
+                }
+                logger.info("arrayList.add[" + (vectorLongTuple2._2().longValue() + 1) + "," + matrixIdx + "]:" + vectorLongTuple2._1().toArray()[i]);
+                System.out.println("arrayList.add[" + (vectorLongTuple2._2().longValue() + 1) + "," + matrixIdx + "]:" + vectorLongTuple2._1().toArray()[i]);
+                arrayList.add(new MatrixEntry(vectorLongTuple2._2().longValue() + 1, matrixIdx, vectorLongTuple2._1().toArray()[i]));
+            }
+            return arrayList.iterator();
+        }
+    }
 }

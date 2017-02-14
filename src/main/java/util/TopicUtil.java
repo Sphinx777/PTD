@@ -1,6 +1,7 @@
 package util;
 
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.Optional;
@@ -12,15 +13,18 @@ import org.apache.spark.ml.feature.*;
 import org.apache.spark.mllib.linalg.Matrix;
 import org.apache.spark.mllib.linalg.SingularValueDecomposition;
 import org.apache.spark.mllib.linalg.Vector;
+import org.apache.spark.mllib.linalg.distributed.BlockMatrix;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.mllib.linalg.distributed.RowMatrix;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
+import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
 import topicDerivation.TopicMain;
+import util.nmf.NMF;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -31,6 +35,7 @@ import java.util.*;
 public class TopicUtil {
     private static Random r = new Random(System.currentTimeMillis());
     static final double dbMinForRandom = 0.0;
+    static Logger logger = Logger.getLogger(TopicUtil.class.getName());
 
     public static int computeArrayIntersection(String[] arr1, String[] arr2) {
         Set<String> aList = new LinkedHashSet<String>(Arrays.asList(arr1));
@@ -61,107 +66,123 @@ public class TopicUtil {
         return (1 / (1 + Math.pow(Math.E, (-1 * x))));
     }
 
-    public static CoordinateMatrix getInverseCoordinateMatrix(CoordinateMatrix srcMatrix) {
-        SingularValueDecomposition<RowMatrix, Matrix> svdComs = srcMatrix.toRowMatrix().computeSVD((int) srcMatrix.numCols(), true, 1e-9);
-        final long numRows = srcMatrix.numRows();
-        final long numCols = srcMatrix.numCols();
-        final LongAccumulator rowAccumulator = TopicMain.sparkSession.sparkContext().longAccumulator();
-        final LongAccumulator colAccumulator = TopicMain.sparkSession.sparkContext().longAccumulator();
+//    public static CoordinateMatrix getInverseCoordinateMatrix(CoordinateMatrix srcMatrix) {
+//        SingularValueDecomposition<RowMatrix, Matrix> svdComs = srcMatrix.toRowMatrix().computeSVD((int) srcMatrix.numCols(), true, 1e-9);
+//        final long numRows = srcMatrix.numRows();
+//        final long numCols = srcMatrix.numCols();
+//        final LongAccumulator rowAccumulator = TopicMain.sparkSession.sparkContext().longAccumulator();
+//        final LongAccumulator colAccumulator = TopicMain.sparkSession.sparkContext().longAccumulator();
+//
+//        //U
+//        rowAccumulator.reset();
+//        colAccumulator.reset();
+//        JavaRDD<MatrixEntry> UMatRDD = svdComs.U().rows().toJavaRDD().flatMap(new FlatMapFunction<Vector, MatrixEntry>() {
+//            @Override
+//            public Iterator<MatrixEntry> call(Vector vector) throws Exception {
+//                List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+//                for (double db : vector.toArray()) {
+//                    System.out.println(db);
+//                    arrayList.add(new MatrixEntry(rowAccumulator.value(), colAccumulator.value(), db));
+//                    colAccumulator.add(1);
+//                    if (colAccumulator.value() >= numCols) {
+//                        colAccumulator.reset();
+//                        rowAccumulator.add(1);
+//                    }
+//
+//                    if (rowAccumulator.value() >= numRows) {
+//                        rowAccumulator.reset();
+//                    }
+//                }
+//                return arrayList.iterator();
+//            }
+//        });
+//        UMatRDD.count();
+//        CoordinateMatrix UtranMat = new CoordinateMatrix(UMatRDD.rdd()).transpose();
+//
+//        //S
+//        double[] dbSvds = svdComs.s().toArray();
+//
+//        for (int i = 0; i < dbSvds.length; i++) {
+//            //System.out.println("before db:"+dbSvds[i]);
+//            dbSvds[i] = Math.pow(dbSvds[i], -1);
+//            //System.out.println("after db:"+dbSvds[i]);
+//        }
+//        colAccumulator.reset();
+//        JavaRDD<MatrixEntry> SMatRDD = TopicMain.sparkSession.createDataset(Arrays.asList(ArrayUtils.toObject(dbSvds)), Encoders.DOUBLE()).toJavaRDD().flatMap(new FlatMapFunction<Double, MatrixEntry>() {
+//            @Override
+//            public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
+//                List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+//                arrayList.add(new MatrixEntry(colAccumulator.value(), colAccumulator.value(), aDouble.doubleValue()));
+//                colAccumulator.add(1);
+//                return arrayList.iterator();
+//            }
+//        });
+//        //System.out.println(sMatRDD.count());
+//        CoordinateMatrix sInvMat = new CoordinateMatrix(SMatRDD.rdd());
+//
+//        //V
+////		for (int i=0;i<svdComs.V().numRows();i++){
+////			for (int j=0;j<svdComs.V().numCols();j++){
+////				System.out.println("("+i+","+j+"):"+svdComs.V().apply(i,j));
+////			}
+////		}
+//        rowAccumulator.reset();
+//        colAccumulator.reset();
+//        JavaRDD<MatrixEntry> VMatRDD = TopicMain.sparkSession.createDataset(Arrays.asList(ArrayUtils.toObject(svdComs.V().toArray())), Encoders.DOUBLE()).toJavaRDD().flatMap(new FlatMapFunction<Double, MatrixEntry>() {
+//            @Override
+//            public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
+//                List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+//                arrayList.add(new MatrixEntry(rowAccumulator.value(), colAccumulator.value(), aDouble.doubleValue()));
+//                rowAccumulator.add(1);
+//                if (rowAccumulator.value() >= numRows) {
+//                    rowAccumulator.reset();
+//                    colAccumulator.add(1);
+//                }
+//
+//                if (colAccumulator.value() >= numCols) {
+//                    colAccumulator.reset();
+//                }
+//                return arrayList.iterator();
+//            }
+//        });
+//        //VMatRDD.count();
+//        CoordinateMatrix vMat = new CoordinateMatrix(VMatRDD.rdd());
+//
+//        System.out.println(vMat.numRows() + "," + vMat.numCols());
+//        System.out.println(sInvMat.numRows() + "," + sInvMat.numCols());
+//        System.out.println(UtranMat.numRows() + "," + UtranMat.numCols());
+//        return vMat.toBlockMatrix().multiply(sInvMat.toBlockMatrix()).multiply(UtranMat.toBlockMatrix()).toCoordinateMatrix();
+//    }
 
-        //U
-        rowAccumulator.reset();
-        colAccumulator.reset();
-        JavaRDD<MatrixEntry> UMatRDD = svdComs.U().rows().toJavaRDD().flatMap(new FlatMapFunction<Vector, MatrixEntry>() {
-            @Override
-            public Iterator<MatrixEntry> call(Vector vector) throws Exception {
-                List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-                for (double db : vector.toArray()) {
-                    System.out.println(db);
-                    arrayList.add(new MatrixEntry(rowAccumulator.value(), colAccumulator.value(), db));
-                    colAccumulator.add(1);
-                    if (colAccumulator.value() >= numCols) {
-                        colAccumulator.reset();
-                        rowAccumulator.add(1);
-                    }
-
-                    if (rowAccumulator.value() >= numRows) {
-                        rowAccumulator.reset();
-                    }
-                }
-                return arrayList.iterator();
-            }
-        });
-        //UMatRDD.count();
-        CoordinateMatrix UtranMat = new CoordinateMatrix(UMatRDD.rdd()).transpose();
-
-        //S
-        double[] dbSvds = svdComs.s().toArray();
-
-        for (int i = 0; i < dbSvds.length; i++) {
-            //System.out.println("before db:"+dbSvds[i]);
-            dbSvds[i] = Math.pow(dbSvds[i], -1);
-            //System.out.println("after db:"+dbSvds[i]);
-        }
-        colAccumulator.reset();
-        JavaRDD<MatrixEntry> SMatRDD = TopicMain.sparkSession.createDataset(Arrays.asList(ArrayUtils.toObject(dbSvds)), Encoders.DOUBLE()).toJavaRDD().flatMap(new FlatMapFunction<Double, MatrixEntry>() {
-            @Override
-            public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
-                List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-                arrayList.add(new MatrixEntry(colAccumulator.value(), colAccumulator.value(), aDouble.doubleValue()));
-                colAccumulator.add(1);
-                return arrayList.iterator();
-            }
-        });
-        //System.out.println(sMatRDD.count());
-        CoordinateMatrix sInvMat = new CoordinateMatrix(SMatRDD.rdd());
-
-        //V
-//		for (int i=0;i<svdComs.V().numRows();i++){
-//			for (int j=0;j<svdComs.V().numCols();j++){
-//				System.out.println("("+i+","+j+"):"+svdComs.V().apply(i,j));
-//			}
-//		}
-        rowAccumulator.reset();
-        colAccumulator.reset();
-        JavaRDD<MatrixEntry> VMatRDD = TopicMain.sparkSession.createDataset(Arrays.asList(ArrayUtils.toObject(svdComs.V().toArray())), Encoders.DOUBLE()).toJavaRDD().flatMap(new FlatMapFunction<Double, MatrixEntry>() {
-            @Override
-            public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
-                List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-                arrayList.add(new MatrixEntry(rowAccumulator.value(), colAccumulator.value(), aDouble.doubleValue()));
-                rowAccumulator.add(1);
-                if (rowAccumulator.value() >= numRows) {
-                    rowAccumulator.reset();
-                    colAccumulator.add(1);
-                }
-
-                if (colAccumulator.value() >= numCols) {
-                    colAccumulator.reset();
-                }
-                return arrayList.iterator();
-            }
-        });
-        //VMatRDD.count();
-        CoordinateMatrix vMat = new CoordinateMatrix(VMatRDD.rdd());
-
-        System.out.println(vMat.numRows() + "," + vMat.numCols());
-        System.out.println(sInvMat.numRows() + "," + sInvMat.numCols());
-        System.out.println(UtranMat.numRows() + "," + UtranMat.numCols());
-        return vMat.toBlockMatrix().multiply(sInvMat.toBlockMatrix()).multiply(UtranMat.toBlockMatrix()).toCoordinateMatrix();
-    }
-
-    public static CoordinateMatrix getCoorMatOption(TopicConstant.MatrixOperation srcOpt, CoordinateMatrix matDividend, CoordinateMatrix matDivisor) {
+    public static CoordinateMatrix getCoorMatOption(TopicConstant.MatrixOperation srcOpt, BlockMatrix matDividend, BlockMatrix matDivisor) {
         TopicConstant.MatrixOperation operation = srcOpt;
-        JavaPairRDD<String, Double> tmpDividendRDD = matDividend.entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
+        logger.info("getCoorMatOption start:"+srcOpt.toString());
+
+        JavaPairRDD<String, Double> tmpDividendRDD = matDividend.toCoordinateMatrix().entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
             public Tuple2<String, Double> call(MatrixEntry entry) throws Exception {
                 return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
             }
         });
 
-        JavaPairRDD<String, Double> tmpDivisorRDD = matDivisor.entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
+//        tmpDividendRDD.foreach(new VoidFunction<Tuple2<String, Double>>() {
+//            @Override
+//            public void call(Tuple2<String, Double> stringDoubleTuple2) throws Exception {
+//                System.out.println("the dividend in pair:"+stringDoubleTuple2._1());
+//            }
+//        });
+
+        JavaPairRDD<String, Double> tmpDivisorRDD = matDivisor.toCoordinateMatrix().entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
             public Tuple2<String, Double> call(MatrixEntry entry) throws Exception {
                 return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
             }
         });
+
+//        tmpDivisorRDD.foreach(new VoidFunction<Tuple2<String, Double>>() {
+//            @Override
+//            public void call(Tuple2<String, Double> stringDoubleTuple2) throws Exception {
+//                System.out.println("the divisor in pair:"+stringDoubleTuple2._1());
+//            }
+//        });
 
         JavaPairRDD<String, Tuple2<Double, Optional<Double>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
 
@@ -187,6 +208,9 @@ public class TopicUtil {
                     }
                     entryList.add(new MatrixEntry(Long.parseLong(loc[0]), Long.parseLong(loc[1]), value));
                 }
+                for (MatrixEntry mat:entryList) {
+                    System.out.println("tuple iterator:("+mat.i()+","+mat.j()+")");
+                }
                 return entryList.iterator();
             }
         }
@@ -196,12 +220,14 @@ public class TopicUtil {
         //System.out.println(resultMat.entries().count());
         //System.out.println(resultMat.numRows());
         //System.out.println(resultMat.numCols());
-        resultMat.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
-            @Override
-            public void call(MatrixEntry matrixEntry) throws Exception {
-                System.out.println(matrixEntry.i() + "," + matrixEntry.j() + ":" + matrixEntry.value());
-            }
-        });
+//        resultMat.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
+//            @Override
+//            public void call(MatrixEntry matrixEntry) throws Exception {
+//                System.out.println("getCoorMatOption result--"+srcOpt.toString()+":"+matrixEntry.i() + "," + matrixEntry.j() + ":" + matrixEntry.value());
+//                logger.info("getCoorMatOption result--"+srcOpt.toString()+":"+matrixEntry.i() + "," + matrixEntry.j() + ":" + matrixEntry.value());
+//            }
+//        });
+        logger.info("getCoorMatOption end!");
         return resultMat;
     }
 
@@ -238,6 +264,7 @@ public class TopicUtil {
 
         StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
         Dataset<Row> filterData = remover.transform(wordsData);
+        filterData.persist(StorageLevel.MEMORY_ONLY_SER());
 
         //create corpus
         JavaRDD<String> outputCorpusStringRDD = filterData.select("words").toJavaRDD().map(new Function<Row, String>() {
@@ -247,7 +274,8 @@ public class TopicUtil {
                 return String.join(TopicConstant.SPACE_DELIMITER,Arrays.copyOf(rowList.toArray(),rowList.size(),String[].class));
             }
         });
-        outputCorpusStringRDD.saveAsTextFile(corpusFilePath);
+        //outputCorpusStringRDD.collect();
+        outputCorpusStringRDD.coalesce(1,true).saveAsTextFile(corpusFilePath);
 
         //create word vector
         Word2Vec word2Vec = new Word2Vec()
@@ -257,7 +285,8 @@ public class TopicUtil {
 
         Word2VecModel model = word2Vec.fit(filterData);
         Dataset<Row> vectorDS = model.transform(filterData);
-        model.getVectors().toJavaRDD().saveAsTextFile(wordVectorFilePath);
+        //model.getVectors().toJavaRDD().collect();
+        model.getVectors().toJavaRDD().coalesce(1,true).saveAsTextFile(wordVectorFilePath);
     }
 
     public static List<String[]> readTopicWordList(String inputTopicWordPath){

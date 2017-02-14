@@ -1,23 +1,35 @@
 package topicDerivation;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.serializers.FieldSerializer;
+import edu.nju.pasalab.marlin.matrix.BlockMatrix;
+import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import org.apache.log4j.Logger;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
+import org.apache.spark.serializer.KryoRegistrator;
 import org.apache.spark.sql.*;
+import org.apache.spark.sql.catalyst.util.StringUtils;
 import org.apache.spark.sql.execution.columnar.STRING;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.storage.StorageLevel;
+import org.apache.spark.util.CollectionAccumulator;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
+import scala.Tuple2;
+import scala.util.parsing.combinator.testing.Str;
 import util.*;
 import util.nmf.NMF;
 import util.tfidf.TFIDF;
@@ -40,6 +52,8 @@ public class TopicMain {
 		CmdLineParser parser = new CmdLineParser(cmdArgs);
 		try {
 			parser.parseArgument(args);
+            System.out.println("model:"+cmdArgs.model);
+            logger.info("model:"+cmdArgs.model);
 
             if(!cmdArgs.model.equals("")) {
                 //for local build
@@ -55,8 +69,9 @@ public class TopicMain {
                         //for local build
                         //.master("local")
                         .appName("TopicDerivation")
-                        .config("spark.executor.heartbeatInterval","300000")
                         .config("spark.sql.warehouse.dir", "file:///")
+                        .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
+                        .config("spark.kryo.registrator",TweetInfoKryoRegister.class.getName())
                         .getOrCreate();
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
@@ -129,8 +144,11 @@ public class TopicMain {
                     }
                 });
 
+                tweetJavaRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+
                 Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
                 Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
+                ds.persist(StorageLevel.MEMORY_ONLY_SER());
 
                 //transform to word vector
                 if (cmdArgs.model.equals("vector")) {
@@ -148,7 +166,7 @@ public class TopicMain {
                     logger.info("compute coherence start!");
 
                     //DTTD , intJNMF...etc
-                    ds.show();
+                    //ds.show();
 
                     List<Row> mentionDataset = ds.select("userName", "dateString", "tweet", "tweetId", "mentionMen", "userInteraction").collectAsList();
 
@@ -159,7 +177,7 @@ public class TopicMain {
 
                     //put into coordinateMatrix
                     JavaRDD<MatrixEntry> poRDD = computePORDD.flatMap(new GetMentionEntry());
-
+                    poRDD.persist(StorageLevel.MEMORY_ONLY_SER());
                     logger.info("put coordinate matrix!");
 
                     //normal
@@ -172,6 +190,7 @@ public class TopicMain {
                     logger.info("build NMF model!");
                     interactionNMF.buildNMFModel();
                     CoordinateMatrix W = interactionNMF.getW();
+                    //poRDD.unpersist();
 
                     Dataset<Row> tfidfDataset = ds.select("tweetId", "tweet");
                     Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(), schemaTFIDF);
@@ -179,23 +198,27 @@ public class TopicMain {
                     //tfidf
                     Broadcast<HashMap<String, String>> brTweetIDMap = sc.broadcast(new HashMap<String, String>());
                     Broadcast<HashMap<String, String>> brTweetWordMap = sc.broadcast(new HashMap<String, String>());
-                    Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
+                    //Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
+                    CollectionAccumulator<String> stringAccumulator = sc.sc().collectionAccumulator();
+
                     tweetIDAccumulator.reset();
 
-                    TFIDF tfidf = new TFIDF(sentenceData, brTweetIDMap, brTweetWordMap, brHashSet, sc.sc().longAccumulator());
+                    sentenceData.persist(StorageLevel.MEMORY_ONLY_SER());
+                    TFIDF tfidf = new TFIDF(sentenceData,sc, stringAccumulator);
 
                     logger.info("build tfidf model!");
                     tfidf.buildModel();
                     NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
-                    System.out.println(W.entries().count());
+                    //System.out.println(W.entries().count());
                     tfidfNMF.setW(W);
 
                     logger.info("build tfidf NMF model!");
                     tfidfNMF.buildNMFModel();
-                    CoordinateMatrix W1 = tfidfNMF.getW();
+                    //CoordinateMatrix W1 = tfidfNMF.getW();
                     CoordinateMatrix H1 = tfidfNMF.getH();
+                    //sentenceData.unpersist();
 
-                    System.out.println(H1.entries().count());
+                    //System.out.println(H1.entries().count());
 
                     logger.info("order NMF score!");
                     JavaRDD<LinkedHashMap<Integer, Double>> cmpRDD = H1.toRowMatrix().rows().toJavaRDD().map(new Function<Vector, LinkedHashMap<Integer, Double>>() {
@@ -219,20 +242,38 @@ public class TopicMain {
 
                             LinkedHashMap<Integer, Double> result = new LinkedHashMap<Integer, Double>();
                             for (Map.Entry<Integer, Double> entry : list) {
+                                System.out.println("order NMF:"+entry.getKey()+"--"+entry.getValue());
+                                logger.info("order NMF:"+entry.getKey()+"--"+entry.getValue());
                                 result.put(entry.getKey(), entry.getValue());
                             }
                             return result;
-                        }
+                    }
                     });
 
-                    System.out.println(cmpRDD.count());
+                    cmpRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+
+                    //System.out.println("cmpRdd count:"+cmpRDD.count());
+                    //logger.info("cmpRdd count:"+cmpRDD.count());
                     logger.info("transform to JSON!");
+
+                    //test
+                    //logger.info("tfidf.getTweetIDMap.entrySet.size:"+tfidf.getTweetIDMap().entrySet().size());
+//                    for(Map.Entry<String,String> entry:tfidf.getTweetIDMap().entrySet()){
+//                        logger.info("tfidf.getTweetIDMap():"+entry.getKey()+","+entry.getValue());
+//                    }
+
                     JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap(),cmdArgs.numTopWords));
-                    System.out.println(jsonRDD.count());
-                    jsonRDD.saveAsTextFile(outFilePath);
+                    //System.out.println("jsonRDD count:"+jsonRDD.count());
+                    //logger.info("jsonRDD count:"+jsonRDD.count());
+                    System.out.println("outFilePath:"+outFilePath);
+                    logger.info("outFilePath:"+outFilePath);
+                    //jsonRDD.collect();
+                    jsonRDD.coalesce(1,true).saveAsTextFile(outFilePath);
 
                     logger.info("get top topic word list!");
-                    topicWordList = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords)).collect();
+                    System.out.println("get top topic word list!");
+                    JavaRDD<String[]> topicWordRDD = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords));
+                    topicWordList = topicWordRDD.collect();
                 } else {
                     //model = "coherence"
                     logger.info("read topic word list!");
@@ -246,21 +287,31 @@ public class TopicMain {
                         return v1.getTweet();
                     }
                 });
+                tweetStrRDD.persist(StorageLevel.MEMORY_ONLY_SER());
                 DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
 
                 double tmpCoherenceValue;
                 Broadcast<HashMap<String, Integer>> brWordCntMap = sc.broadcast(new HashMap<String, Integer>());
 
                 logger.info("compute the topic coherence value!");
+                System.out.println("compute the topic coherence value!");
+                logger.info("the topicWordList length:"+topicWordList.size());
+                System.out.println("the topicWordList length:"+topicWordList.size());
+
                 for (String[] strings : topicWordList) {
-                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap);
+                    logger.info("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
+                    System.out.println("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
+
+                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession);
                     if (Double.compare(tmpCoherenceValue, maxCoherenceValue) > 0) {
                         maxCoherenceValue = tmpCoherenceValue;
                     }
                     dbAccumulator.add(tmpCoherenceValue);
                 }
                 System.out.println("Max Topic coherence value of top " + cmdArgs.numTopWords + " words:" + maxCoherenceValue);
+                logger.info("Max Topic coherence value of top " + cmdArgs.numTopWords + " words:" + maxCoherenceValue);
                 System.out.println("Average topic coherence value of top " + cmdArgs.numTopWords + " words:" + dbAccumulator.value() / (double) topicWordList.size());
+                logger.info("Average topic coherence value of top " + cmdArgs.numTopWords + " words:" + dbAccumulator.value() / (double) topicWordList.size());
 
                 //Object vs = poMatrix.toRowMatrix().rows().take(1);
                 //Encoders.STRING()
@@ -281,4 +332,10 @@ public class TopicMain {
             ex.printStackTrace();
         }
 	}
+
+    public static class TweetInfoKryoRegister implements KryoRegistrator {
+        public void registerClasses(Kryo kryo) {
+            kryo.register(TweetInfo.class, new FieldSerializer(kryo, TweetInfo.class));
+        }
+    }
 }

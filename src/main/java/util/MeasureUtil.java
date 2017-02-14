@@ -4,12 +4,17 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
+import org.apache.spark.mllib.linalg.distributed.BlockMatrix;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.DoubleAccumulator;
+import org.apache.spark.util.LongAccumulator;
+import util.nmf.NMF;
 
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Created by user on 2016/10/16.
@@ -17,13 +22,15 @@ import java.util.*;
 public class MeasureUtil {
     //public static HashMap<String,Integer> wordCntMap=new HashMap<String,Integer>();
 
-    public static double getKLDivergence(CoordinateMatrix V, CoordinateMatrix W, CoordinateMatrix H, SparkSession sparkSession){
+    static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(MeasureUtil.class.getName());
+    public static double getKLDivergence(BlockMatrix vBkMat, BlockMatrix wBkMat, BlockMatrix hBkMat, SparkSession sparkSession){
         final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
-        CoordinateMatrix WH = W.toBlockMatrix().multiply(H.toBlockMatrix()).toCoordinateMatrix();
-        CoordinateMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,V,WH);
+        BlockMatrix whBkMat = wBkMat.multiply(hBkMat).persist(StorageLevel.MEMORY_ONLY_SER());
+
+        CoordinateMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,vBkMat,whBkMat);
         CoordinateMatrix logResult = getMatrixLogValue(loginSide);
-        CoordinateMatrix diffPara = WH.toBlockMatrix().subtract(V.toBlockMatrix()).toCoordinateMatrix();
-        CoordinateMatrix result = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply,V,logResult).toBlockMatrix().add(diffPara.toBlockMatrix()).toCoordinateMatrix();
+        BlockMatrix diffPara = whBkMat.subtract(vBkMat).persist(StorageLevel.MEMORY_ONLY_SER());
+        CoordinateMatrix result = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply,vBkMat,logResult.toBlockMatrix()).toBlockMatrix().add(diffPara).toCoordinateMatrix();
 
 //        result.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
 //            @Override
@@ -57,29 +64,36 @@ public class MeasureUtil {
         return targetMat;
     }
 
-    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD , Broadcast<HashMap<String,Integer>> brWordCntMap){
+    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD , Broadcast<HashMap<String,Integer>> brWordCntMap , SparkSession sparkSession){
         //parameter : topic word array, RDD tweet
         //return  : dbSum
 
         double dbSum = 0.0;
         int WjCount, WiWjCount;
         boolean isWjCounted, isWiWjCounted;
-        HashMap<String,Integer> wordCntMap=brWordCntMap.getValue();
+        //HashMap<String,Integer> wordCntMap=brWordCntMap.getValue();
+        //test
+        HashMap<String,Integer> wordCntMap2= new HashMap<String,Integer>();
+        LongAccumulator wjAccumulator = sparkSession.sparkContext().longAccumulator();
+        LongAccumulator hashKeyAccumulator = sparkSession.sparkContext().longAccumulator();
 
         //topic word array:total topic word , reference:the tfidf corpus
         //hashMap key rule:alphabetical
         for (int i = 1; i < topicWordArray.length; i++) {
             for (int j = 0; j <= i - 1; j++) {
                 //prevent repeat compute the same word , Wi == Wj
-                if (wordCntMap.containsKey(topicWordArray[j])) {
+                if (wordCntMap2.containsKey(topicWordArray[j])) {
                     isWjCounted = true;
                 } else {
                     isWjCounted = false;
                 }
 
                 //prevent repeat compute the same word
+
+                logger.info("topicWordArray[i]:"+i+"--"+topicWordArray[i]);
+                logger.info("topicWordArray[j]:"+j+"--"+topicWordArray[j]);
                 String hashKey = topicWordArray[i].compareTo(topicWordArray[j]) >= 0 ? topicWordArray[j]+","+topicWordArray[i] : topicWordArray[i]+","+topicWordArray[j];
-                if (wordCntMap.containsKey(hashKey)) {
+                if (wordCntMap2.containsKey(hashKey)) {
                     isWiWjCounted = true;
                 } else {
                     isWiWjCounted = false;
@@ -87,15 +101,35 @@ public class MeasureUtil {
 
                 if (isWiWjCounted == false || isWjCounted == false) {
                     //iterate the all tweet(document)
-                    tweetRDD.foreach(new tweetRDD_ForeachFunc(topicWordArray,brWordCntMap,hashKey,i,j,isWjCounted,isWiWjCounted));
+                    //tweetRDD.foreach(new tweetRDD_ForeachFunc(topicWordArray,brWordCntMap,hashKey,i,j,isWjCounted,isWiWjCounted));
+
+                    wjAccumulator.reset();
+                    if(wordCntMap2.containsKey(topicWordArray[j])) {
+                        wjAccumulator.add(wordCntMap2.get(topicWordArray[j]));
+                    }
+
+                    hashKeyAccumulator.reset();
+                    if(wordCntMap2.containsKey(hashKey)) {
+                        hashKeyAccumulator.add(wordCntMap2.get(hashKey));
+                    }
+
+                    //test
+                    tweetRDD.foreach(new tweetRDD_ForeachFunc2(topicWordArray[i],topicWordArray[j],wjAccumulator,hashKeyAccumulator,isWjCounted,isWiWjCounted));
+                    if(wjAccumulator.value() > 0) {
+                        wordCntMap2.put(topicWordArray[j], wjAccumulator.value().intValue());
+                    }
+
+                    if(hashKeyAccumulator.value() > 0) {
+                        wordCntMap2.put(hashKey, hashKeyAccumulator.value().intValue());
+                    }
                 }
-                System.out.println("upper:"+((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1));
-                System.out.println("lower:"+(wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue()) );
+                System.out.println("upper:"+((wordCntMap2.get(hashKey)==null?0:wordCntMap2.get(hashKey).intValue()) + 1));
+                System.out.println("lower:"+(wordCntMap2.get(topicWordArray[j])==null?0:wordCntMap2.get(topicWordArray[j]).intValue()) );
 
                 System.out.println("dbSum:"+dbSum);
-                System.out.println("wordCntValue:"+Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue())));
-                System.out.println("log value:"+Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue())));
-                dbSum += Math.log((double) ((wordCntMap.get(hashKey)==null?0:wordCntMap.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap.get(topicWordArray[j])==null?0:wordCntMap.get(topicWordArray[j]).intValue()));
+                System.out.println("wordCntValue:"+Math.log((double) ((wordCntMap2.get(hashKey)==null?0:wordCntMap2.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap2.get(topicWordArray[j])==null?0:wordCntMap2.get(topicWordArray[j]).intValue())));
+                System.out.println("log value:"+Math.log((double) ((wordCntMap2.get(hashKey)==null?0:wordCntMap2.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap2.get(topicWordArray[j])==null?0:wordCntMap2.get(topicWordArray[j]).intValue())));
+                dbSum += Math.log((double) ((wordCntMap2.get(hashKey)==null?0:wordCntMap2.get(hashKey).intValue()) + 1.0) / (double) (wordCntMap2.get(topicWordArray[j])==null?0:wordCntMap2.get(topicWordArray[j]).intValue()));
             }
         }
         return dbSum;
@@ -144,6 +178,43 @@ class tweetRDD_ForeachFunc implements VoidFunction<String>{
                     WiWjCount = 0;
                 }
                 wrdCntMap.getValue().put(hashKey, WiWjCount + 1);
+            }
+        }
+    }
+}
+
+class tweetRDD_ForeachFunc2 implements VoidFunction<String>{
+    private String wordI , wordJ;
+    private boolean isWjCounted , isWiWjCounted;
+    private LongAccumulator wjAccumulator , hashKeyAccumulator;
+
+    public tweetRDD_ForeachFunc2(String inputWordI , String inputWordJ , LongAccumulator input_wjAccumulator , LongAccumulator input_hashKeyAccumulator , boolean input_isWjCounted , boolean input_isWiWjCounted){
+        wordI = inputWordI;
+        wordJ = inputWordJ;
+        wjAccumulator = input_wjAccumulator;
+        hashKeyAccumulator = input_hashKeyAccumulator;
+        isWjCounted = input_isWjCounted;
+        isWiWjCounted = input_isWiWjCounted;
+    }
+
+    public void call(String tweet){
+        int WjCount,WiWjCount;
+        boolean wjFounded = false;
+        if (!isWjCounted || !isWiWjCounted) {
+            //wjFounded = Arrays.asList(tweet.split(" ")).stream().map(key -> key.toLowerCase()).collect(Collectors.toList()).contains(topicWordArray[idx_j]);
+            wjFounded = Arrays.asList(tweet.split(" ")).stream().anyMatch(key -> key.toLowerCase().indexOf(wordJ.toLowerCase())!=-1);
+        }
+
+        //count Wj
+        if (!isWjCounted && wjFounded) {
+            wjAccumulator.add(1);
+        }
+
+        //count Wi,Wj
+        if (!isWiWjCounted) {
+            Boolean wiFounded = Arrays.asList(tweet.split(" ")).stream().anyMatch(key -> key.toLowerCase().indexOf(wordI.toLowerCase())!=-1);
+            if (wiFounded && wjFounded) {
+                 hashKeyAccumulator.add(1);
             }
         }
     }
