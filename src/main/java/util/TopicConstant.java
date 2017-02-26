@@ -34,4 +34,7 @@ public class TopicConstant {
 
 	@Option(name="-cohInput",usage="Sets a coherence file input")
 	public static String coherenceFilePath;
+
+	@Option(name="-cores",usage="Sets compute cores")
+	public static int cores;
 }

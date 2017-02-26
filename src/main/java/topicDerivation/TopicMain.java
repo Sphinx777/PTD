@@ -1,23 +1,19 @@
 package topicDerivation;
 
+import breeze.linalg.DenseVector;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
-import edu.nju.pasalab.marlin.matrix.BlockMatrix;
+import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
-import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
-import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.serializer.KryoRegistrator;
 import org.apache.spark.sql.*;
-import org.apache.spark.sql.catalyst.util.StringUtils;
-import org.apache.spark.sql.execution.columnar.STRING;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -29,7 +25,6 @@ import org.apache.spark.util.LongAccumulator;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import scala.Tuple2;
-import scala.util.parsing.combinator.testing.Str;
 import util.*;
 import util.nmf.NMF;
 import util.tfidf.TFIDF;
@@ -56,14 +51,16 @@ public class TopicMain {
             logger.info("model:"+cmdArgs.model);
 
             if(!cmdArgs.model.equals("")) {
-                //for local build
-                //System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+
                 logger.info("start");
 
                 StructType schemaTFIDF = new StructType(new StructField[]{
                         new StructField("tweetId", DataTypes.StringType, false, Metadata.empty()),
                         new StructField("tweet", DataTypes.StringType, false, Metadata.empty())
                 });
+
+                //for local build
+                //System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 
                 sparkSession = SparkSession.builder()
                         //for local build
@@ -75,6 +72,16 @@ public class TopicMain {
                         .getOrCreate();
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
+
+//                double[][] dbArray = new double[2][2];
+////
+//                for(int x=0;x<2;x++){
+//                    for(int y=0;y<2;y++){
+//                        dbArray[x][y]=(x+y)*2;
+//                    }
+//                }
+//                DenseVecMatrix dvm = new DenseVecMatrix(sc.sc(), dbArray, 2);
+//
 
                 final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
 
@@ -97,18 +104,25 @@ public class TopicMain {
                 LongAccumulator tweetIDAccumulator = sc.sc().longAccumulator();
 
                 logger.info("compute the mentionMen!");
+                System.out.println("compute the mentionMen!");
+
+                //the tweetInfo accumulator
+                CollectionAccumulator<TweetInfo> collectionAccumulator = sc.sc().collectionAccumulator();
+
                 //set custom javaRDD and compute the mentionMen
                 JavaRDD<TweetInfo> tweetJavaRDD = currDataset.javaRDD().map(new Function<Row, TweetInfo>() {
                     public TweetInfo call(Row row) throws Exception {
                         TweetInfo tweet = new TweetInfo();
-                        tweetIDAccumulator.add(1);
                         tweet.setTweetId(tweetIDAccumulator.value().toString());
+                        tweetIDAccumulator.add(1);
                         logger.info("TweetId:"+tweet.getTweetId());
+                        System.out.println("TweetId:"+tweet.getTweetId());
                         tweet.setDateString(row.getAs("date").toString());
                         tweet.setUserName(row.getAs("userName").toString());
                         tweet.setTweet(row.getAs("tweet").toString());
                         tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
                         tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
+                        collectionAccumulator.add(tweet);
                         return tweet;
                     }
 
@@ -144,15 +158,18 @@ public class TopicMain {
                     }
                 });
 
-                tweetJavaRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+                tweetJavaRDD.persist(StorageLevel.MEMORY_ONLY());
+                logger.info("tweetJavaRDD count:"+tweetJavaRDD.count());
+                //System.out.println("tweetJavaRDD count:"+tweetJavaRDD.count());
 
                 Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
                 Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
-                ds.persist(StorageLevel.MEMORY_ONLY_SER());
+                ds.persist(StorageLevel.MEMORY_ONLY());
 
                 //transform to word vector
                 if (cmdArgs.model.equals("vector")) {
                     logger.info("compute vector!");
+                    System.out.println("compute vector!");
                     String corpusFilePath = cmdArgs.outputFilePath + "_corpus_" + sdf.format((Date) broadcastCurrDate.getValue());
                     String wordVectorFilePath = cmdArgs.outputFilePath + "_wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
                     Dataset<Row> tweetDS = ds.select("tweetId", "tweet");
@@ -164,75 +181,116 @@ public class TopicMain {
                 //compute topic word list
                 if (!cmdArgs.model.equals("coherence")) {
                     logger.info("compute coherence start!");
+                    System.out.println("compute coherence start!");
 
                     //DTTD , intJNMF...etc
                     //ds.show();
 
-                    List<Row> mentionDataset = ds.select("userName", "dateString", "tweet", "tweetId", "mentionMen", "userInteraction").collectAsList();
+                    //old
+                    //List<Row> mentionDataset = ds.select("userName", "dateString", "tweet", "tweetId", "mentionMen", "userInteraction").collectAsList();
 
                     //compute mention string
-                    JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset, (Date) broadcastCurrDate.getValue() , cmdArgs.model));
+                    //old
+                    //JavaRDD<String> computePORDD = tweetJavaRDD.map(new JoinMentionString(mentionDataset, (Date) broadcastCurrDate.getValue() , cmdArgs.model));
+
+                    logger.info("compute the interaction between tweets");
+                    System.out.println("compute the interaction between tweets");
+
+                    //old
+                    //JavaPairRDD<Object,ArrayList<Object>> computePORDD = tweetJavaRDD.mapToPair(new JoinMentionString(mentionDataset,(Date) broadcastCurrDate.getValue() , cmdArgs.model));
+
+                    //new
+                    JavaPairRDD<Object,ArrayList<Object>> computePORDD = tweetJavaRDD.mapToPair(new JoinMentionString(collectionAccumulator.value(),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
+
+                    JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> tweetTuple2RDD = computePORDD.flatMap(new FlatMapFunction<Tuple2<Object, ArrayList<Object>>, Tuple2<Tuple2<Object, Object>, Object>>() {
+                        @Override
+                        public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object, ArrayList<Object>> objectArrayListTuple2) throws Exception {
+
+                            ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
+                            for(int i=0;i<objectArrayListTuple2._2().size();i++){
+                                Tuple2<Object,Object> locTuple = new Tuple2<Object, Object>(objectArrayListTuple2._1(),Long.valueOf(Integer.valueOf(i)));
+                                tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple,objectArrayListTuple2._2().toArray()[i]));
+                            }
+                            logger.info("compute flatmap tweet id:"+objectArrayListTuple2._1());
+                            System.out.println("compute flatmap tweet id:"+objectArrayListTuple2._1());
+                            return tuple2s.iterator();
+                        }
+                    });
+
+                    //tweetTuple2RDD.collect();
+                    //logger.info("tweetTuple2RDD count:"+tweetTuple2RDD.count());
+                    CoordinateMatrix coordinateMatrix = new CoordinateMatrix(tweetTuple2RDD.rdd());
+                    DenseVecMatrix tweetDVM = coordinateMatrix.toDenseVecMatrix();
 
                     logger.info("set mention entry!");
+                    System.out.println("set mention entry!");
 
                     //put into coordinateMatrix
-                    JavaRDD<MatrixEntry> poRDD = computePORDD.flatMap(new GetMentionEntry());
-                    poRDD.persist(StorageLevel.MEMORY_ONLY_SER());
-                    logger.info("put coordinate matrix!");
+                    //JavaRDD<MatrixEntry> poRDD = computePORDD.flatMap(new GetMentionEntry());
 
                     //normal
-                    CoordinateMatrix poMatrix = new CoordinateMatrix(poRDD.rdd());
+                    //CoordinateMatrix poMatrix = new CoordinateMatrix(poRDD.rdd());
 
                     logger.info("compute interaction NMF!");
+                    System.out.println("compute interaction NMF!");
                     //interaction
-                    NMF interactionNMF = new NMF(poMatrix, true, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
+                    NMF interactionNMF = new NMF(tweetDVM, true, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
 
                     logger.info("build NMF model!");
+                    System.out.println("build NMF model!");
                     interactionNMF.buildNMFModel();
-                    CoordinateMatrix W = interactionNMF.getW();
+                    DenseVecMatrix W = interactionNMF.getW();
                     //poRDD.unpersist();
 
                     Dataset<Row> tfidfDataset = ds.select("tweetId", "tweet");
                     Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(), schemaTFIDF);
 
                     //tfidf
-                    Broadcast<HashMap<String, String>> brTweetIDMap = sc.broadcast(new HashMap<String, String>());
-                    Broadcast<HashMap<String, String>> brTweetWordMap = sc.broadcast(new HashMap<String, String>());
+                    //Broadcast<HashMap<String, String>> brTweetIDMap = sc.broadcast(new HashMap<String, String>());
+                    //Broadcast<HashMap<String, String>> brTweetWordMap = sc.broadcast(new HashMap<String, String>());
                     //Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
                     CollectionAccumulator<String> stringAccumulator = sc.sc().collectionAccumulator();
 
                     tweetIDAccumulator.reset();
 
-                    sentenceData.persist(StorageLevel.MEMORY_ONLY_SER());
+                    sentenceData.persist(StorageLevel.MEMORY_ONLY());
                     TFIDF tfidf = new TFIDF(sentenceData,sc, stringAccumulator);
 
                     logger.info("build tfidf model!");
+                    System.out.println("build tfidf model!");
                     tfidf.buildModel();
-                    NMF tfidfNMF = new NMF(tfidf.getCoorMatOfTFIDF(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
+                    //old
+                    //NMF tfidfNMF = new NMF(tfidf.getTfidfDVM(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
+                    NMF tfidfNMF = new NMF(tfidf.getTfidfDVM(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
+
                     //System.out.println(W.entries().count());
                     tfidfNMF.setW(W);
 
                     logger.info("build tfidf NMF model!");
+                    System.out.println("build tfidf NMF model!");
                     tfidfNMF.buildNMFModel();
-                    //CoordinateMatrix W1 = tfidfNMF.getW();
-                    CoordinateMatrix H1 = tfidfNMF.getH();
+                    //CoordinateMatrix W1 = tfidfNMF.getOriginalW();
+                    DenseVecMatrix H1 = tfidfNMF.getH();
                     //sentenceData.unpersist();
 
                     //System.out.println(H1.entries().count());
 
                     logger.info("order NMF score!");
-                    JavaRDD<LinkedHashMap<Integer, Double>> cmpRDD = H1.toRowMatrix().rows().toJavaRDD().map(new Function<Vector, LinkedHashMap<Integer, Double>>() {
+                    System.out.println("order NMF score!");
+                    JavaRDD<LinkedHashMap<Integer, Double>> cmpRDD = H1.rows().toJavaRDD().map(new Function<Tuple2<Object, DenseVector<Object>>, LinkedHashMap<Integer, Double>>() {
                         @Override
-                        public LinkedHashMap<Integer, Double> call(Vector vector) throws Exception {
-                            double[] tmpDBArray = vector.toArray();
-                            HashMap<Integer, Double> resultMap = new HashMap<Integer, Double>();
-                            for (int i = 0; i < tmpDBArray.length; i++) {
-                                if (tmpDBArray[i] > 0) {
+                        public LinkedHashMap<Integer, Double> call(Tuple2<Object, DenseVector<Object>> srcTuple) throws Exception {
+                            ArrayList<Object> tmpList = new ArrayList<Object>();
+                            Collections.addAll(tmpList,srcTuple._2().data());
+                            double[] tmpDBArray = (double[])tmpList.get(0);
+                            HashMap<Integer,Double> resultMap = new HashMap<Integer, Double>();
+                            for(int i =0;i < tmpDBArray.length;i++){
+                                if(tmpDBArray[i] > 0){
                                     resultMap.put(i, tmpDBArray[i]);
                                 }
                             }
-                            List<Map.Entry<Integer, Double>> list =
-                                    new LinkedList<Map.Entry<Integer, Double>>(resultMap.entrySet());
+
+                            List<Map.Entry<Integer,Double>> list = new LinkedList<Map.Entry<Integer, Double>>(resultMap.entrySet());
                             Collections.sort(list, new Comparator<Map.Entry<Integer, Double>>() {
                                 @Override
                                 public int compare(Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2) {
@@ -240,28 +298,57 @@ public class TopicMain {
                                 }
                             });
 
-                            LinkedHashMap<Integer, Double> result = new LinkedHashMap<Integer, Double>();
-                            for (Map.Entry<Integer, Double> entry : list) {
-                                System.out.println("order NMF:"+entry.getKey()+"--"+entry.getValue());
-                                logger.info("order NMF:"+entry.getKey()+"--"+entry.getValue());
+                            LinkedHashMap<Integer,Double> result = new LinkedHashMap<Integer, Double>();
+                            for(Map.Entry<Integer,Double> entry:list){
+                                //System.out.println("order NMF:"+entry.getKey()+"--"+entry.getValue());
+                                //logger.info("order NMF:"+entry.getKey()+"--"+entry.getValue());
                                 result.put(entry.getKey(), entry.getValue());
                             }
                             return result;
-                    }
+                        }
                     });
 
-                    cmpRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+//                    JavaRDD<LinkedHashMap<Integer, Double>> cmpRDD = H1.toRowMatrix().rows().toJavaRDD().map(new Function<Vector, LinkedHashMap<Integer, Double>>() {
+//                        @Override
+//                        public LinkedHashMap<Integer, Double> call(Vector vector) throws Exception {
+//                            double[] tmpDBArray = vector.toArray();
+//                            HashMap<Integer, Double> resultMap = new HashMap<Integer, Double>();
+//                            for (int i = 0; i < tmpDBArray.length; i++) {
+//                                if (tmpDBArray[i] > 0) {
+//                                    resultMap.put(i, tmpDBArray[i]);
+//                                }
+//                            }
+//                            List<Map.Entry<Integer, Double>> list =
+//                                    new LinkedList<Map.Entry<Integer, Double>>(resultMap.entrySet());
+//                            Collections.sort(list, new Comparator<Map.Entry<Integer, Double>>() {
+//                                @Override
+//                                public int compare(Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2) {
+//                                    return (o2.getValue()).compareTo(o1.getValue());
+//                                }
+//                            });
+//
+//                            LinkedHashMap<Integer, Double> result = new LinkedHashMap<Integer, Double>();
+//                            for (Map.Entry<Integer, Double> entry : list) {
+//                                System.out.println("order NMF:"+entry.getKey()+"--"+entry.getValue());
+//                                logger.info("order NMF:"+entry.getKey()+"--"+entry.getValue());
+//                                result.put(entry.getKey(), entry.getValue());
+//                            }
+//                            return result;
+//                    }
+//                    });
+
+                    cmpRDD.persist(StorageLevel.MEMORY_ONLY());
 
                     //System.out.println("cmpRdd count:"+cmpRDD.count());
                     //logger.info("cmpRdd count:"+cmpRDD.count());
-                    logger.info("transform to JSON!");
 
                     //test
                     //logger.info("tfidf.getTweetIDMap.entrySet.size:"+tfidf.getTweetIDMap().entrySet().size());
 //                    for(Map.Entry<String,String> entry:tfidf.getTweetIDMap().entrySet()){
 //                        logger.info("tfidf.getTweetIDMap():"+entry.getKey()+","+entry.getValue());
 //                    }
-
+                    logger.info("transform to JSON!");
+                    System.out.println("transform to JSON!");
                     JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap(),cmdArgs.numTopWords));
                     //System.out.println("jsonRDD count:"+jsonRDD.count());
                     //logger.info("jsonRDD count:"+jsonRDD.count());
@@ -277,6 +364,7 @@ public class TopicMain {
                 } else {
                     //model = "coherence"
                     logger.info("read topic word list!");
+                    System.out.println("read topic word list!");
                     topicWordList = TopicUtil.readTopicWordList(cmdArgs.coherenceFilePath);
                 }
 
@@ -287,7 +375,7 @@ public class TopicMain {
                         return v1.getTweet();
                     }
                 });
-                tweetStrRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+                tweetStrRDD.persist(StorageLevel.MEMORY_ONLY());
                 DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
 
                 double tmpCoherenceValue;
@@ -295,8 +383,9 @@ public class TopicMain {
 
                 logger.info("compute the topic coherence value!");
                 System.out.println("compute the topic coherence value!");
-                logger.info("the topicWordList length:"+topicWordList.size());
-                System.out.println("the topicWordList length:"+topicWordList.size());
+                int topicWrdListSize = topicWordList.size();
+                logger.info("the topicWordList length:"+topicWrdListSize);
+                System.out.println("the topicWordList length:"+topicWrdListSize);
 
                 for (String[] strings : topicWordList) {
                     logger.info("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
@@ -310,8 +399,8 @@ public class TopicMain {
                 }
                 System.out.println("Max Topic coherence value of top " + cmdArgs.numTopWords + " words:" + maxCoherenceValue);
                 logger.info("Max Topic coherence value of top " + cmdArgs.numTopWords + " words:" + maxCoherenceValue);
-                System.out.println("Average topic coherence value of top " + cmdArgs.numTopWords + " words:" + dbAccumulator.value() / (double) topicWordList.size());
-                logger.info("Average topic coherence value of top " + cmdArgs.numTopWords + " words:" + dbAccumulator.value() / (double) topicWordList.size());
+                System.out.println("Average topic coherence value of top " + cmdArgs.numTopWords + " words:" + dbAccumulator.value() / topicWrdListSize);
+                logger.info("Average topic coherence value of top " + cmdArgs.numTopWords + " words:" + dbAccumulator.value() / topicWrdListSize);
 
                 //Object vs = poMatrix.toRowMatrix().rows().take(1);
                 //Encoders.STRING()

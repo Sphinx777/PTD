@@ -1,6 +1,8 @@
 package util;
 
-import org.apache.commons.lang.ArrayUtils;
+import breeze.linalg.DenseVector;
+import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
+import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -8,23 +10,11 @@ import org.apache.spark.api.java.Optional;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFunction;
-import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.ml.feature.*;
-import org.apache.spark.mllib.linalg.Matrix;
-import org.apache.spark.mllib.linalg.SingularValueDecomposition;
-import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.mllib.linalg.distributed.BlockMatrix;
-import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
-import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
-import org.apache.spark.mllib.linalg.distributed.RowMatrix;
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.storage.StorageLevel;
-import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
-import topicDerivation.TopicMain;
-import util.nmf.NMF;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -48,9 +38,9 @@ public class TopicUtil {
             }
         }
 
-        if (list.size() > 0) {
+        //if (list.size() > 0) {
             //System.out.println();
-        }
+        //}
         return list.size();
     }
 
@@ -154,81 +144,94 @@ public class TopicUtil {
 //        return vMat.toBlockMatrix().multiply(sInvMat.toBlockMatrix()).multiply(UtranMat.toBlockMatrix()).toCoordinateMatrix();
 //    }
 
-    public static CoordinateMatrix getCoorMatOption(TopicConstant.MatrixOperation srcOpt, BlockMatrix matDividend, BlockMatrix matDivisor) {
+    public static DenseVecMatrix getCoorMatOption(TopicConstant.MatrixOperation srcOpt, DenseVecMatrix matDividend, DenseVecMatrix matDivisor) {
         TopicConstant.MatrixOperation operation = srcOpt;
         logger.info("getCoorMatOption start:"+srcOpt.toString());
+        System.out.println("getCoorMatOption start:"+srcOpt.toString());
 
-        JavaPairRDD<String, Double> tmpDividendRDD = matDividend.toCoordinateMatrix().entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
-            public Tuple2<String, Double> call(MatrixEntry entry) throws Exception {
-                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
-            }
-        });
+        //long , DenseVector<Double> --> Object , DenseVector<Object>
 
-//        tmpDividendRDD.foreach(new VoidFunction<Tuple2<String, Double>>() {
-//            @Override
-//            public void call(Tuple2<String, Double> stringDoubleTuple2) throws Exception {
-//                System.out.println("the dividend in pair:"+stringDoubleTuple2._1());
+//        JavaPairRDD<String, Double> tmpDividendRDD = matDividend.toCoordinateMatrix().entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
+//            public Tuple2<String, Double> call(MatrixEntry entry) throws Exception {
+//                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
+//            }
+//        });
+     JavaPairRDD<Object,ArrayList<Object>> tmpDividendRDD = matDividend.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ArrayList<Object>>() {
+         @Override
+         public Tuple2<Object, ArrayList<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+             logger.info("matDividend map to pair");
+             System.out.println("matDividend map to pair");
+
+             ArrayList<Object> arrayList = new ArrayList<>();
+             Collections.addAll(arrayList, objectDenseVectorTuple2._2().data());
+             return new Tuple2<Object, ArrayList<Object>>((Object) objectDenseVectorTuple2._1(),arrayList);
+         }
+     });
+
+//        JavaPairRDD<String, Double> tmpDivisorRDD = matDivisor.toCoordinateMatrix().entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
+//            public Tuple2<String, Double> call(MatrixEntry entry) throws Exception {
+//                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
 //            }
 //        });
 
-        JavaPairRDD<String, Double> tmpDivisorRDD = matDivisor.toCoordinateMatrix().entries().toJavaRDD().mapToPair(new PairFunction<MatrixEntry, String, Double>() {
-            public Tuple2<String, Double> call(MatrixEntry entry) throws Exception {
-                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
-            }
-        });
-
-//        tmpDivisorRDD.foreach(new VoidFunction<Tuple2<String, Double>>() {
-//            @Override
-//            public void call(Tuple2<String, Double> stringDoubleTuple2) throws Exception {
-//                System.out.println("the divisor in pair:"+stringDoubleTuple2._1());
-//            }
-//        });
-
-        JavaPairRDD<String, Tuple2<Double, Optional<Double>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
-
-        class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<String, Tuple2<Double, Optional<Double>>>, MatrixEntry> {
-            private final TopicConstant.MatrixOperation operation;
-
-            public Tuple2MatrixEntryFlatMapFunction(TopicConstant.MatrixOperation operation) {
-                this.operation = operation;
-            }
-
-            @Override
-            public Iterator<MatrixEntry> call(Tuple2<String, Tuple2<Double, Optional<Double>>> stringTuple2Tuple2) throws Exception {
-                List<MatrixEntry> entryList = new ArrayList<MatrixEntry>();
-                String[] loc = stringTuple2Tuple2._1().split(TopicConstant.COMMA_DELIMITER);
-                if (stringTuple2Tuple2._2()._2().isPresent()) {
-                    double dividend = stringTuple2Tuple2._2()._1();
-                    double divisor = stringTuple2Tuple2._2()._2().get();
-                    double value = 0.0;
-                    if (operation.equals(TopicConstant.MatrixOperation.Divide)) {
-                        value = dividend / divisor;
-                    } else if (operation.equals(TopicConstant.MatrixOperation.Mutiply)) {
-                        value = dividend * divisor;
-                    }
-                    entryList.add(new MatrixEntry(Long.parseLong(loc[0]), Long.parseLong(loc[1]), value));
-                }
-                for (MatrixEntry mat:entryList) {
-                    System.out.println("tuple iterator:("+mat.i()+","+mat.j()+")");
-                }
-                return entryList.iterator();
-            }
+    JavaPairRDD<Object,ArrayList<Object>> tmpDivisorRDD = matDivisor.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ArrayList<Object>>() {
+        @Override
+        public Tuple2<Object, ArrayList<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+            logger.info("matDivisor map to pair");
+            System.out.println("matDivisor map to pair");
+            ArrayList<Object> arrayList = new ArrayList<>();
+            Collections.addAll(arrayList, objectDenseVectorTuple2._2().data());
+            return new Tuple2<Object, ArrayList<Object>>((Object) objectDenseVectorTuple2._1(),arrayList);
         }
-        JavaRDD<MatrixEntry> resultRDD = tmpRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(operation));
+    });
 
-        CoordinateMatrix resultMat = new CoordinateMatrix(resultRDD.rdd());
-        //System.out.println(resultMat.entries().count());
-        //System.out.println(resultMat.numRows());
-        //System.out.println(resultMat.numCols());
-//        resultMat.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
-//            @Override
-//            public void call(MatrixEntry matrixEntry) throws Exception {
-//                System.out.println("getCoorMatOption result--"+srcOpt.toString()+":"+matrixEntry.i() + "," + matrixEntry.j() + ":" + matrixEntry.value());
-//                logger.info("getCoorMatOption result--"+srcOpt.toString()+":"+matrixEntry.i() + "," + matrixEntry.j() + ":" + matrixEntry.value());
+//        JavaPairRDD<String, Tuple2<Double, Optional<Double>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
+
+     JavaPairRDD<Object,Tuple2<ArrayList<Object>, Optional<ArrayList<Object>>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
+
+//        class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<String, Tuple2<Double, Optional<Double>>>, MatrixEntry> {
+//            private final TopicConstant.MatrixOperation operation;
+
+//            public Tuple2MatrixEntryFlatMapFunction(TopicConstant.MatrixOperation operation) {
+//                this.operation = operation;
 //            }
-//        });
-        logger.info("getCoorMatOption end!");
-        return resultMat;
+
+//            @Override
+//            public Iterator<MatrixEntry> call(Tuple2<String, Tuple2<Double, Optional<Double>>> stringTuple2Tuple2) throws Exception {
+//                List<MatrixEntry> entryList = new ArrayList<MatrixEntry>();
+//                String[] loc = stringTuple2Tuple2._1().split(TopicConstant.COMMA_DELIMITER);
+//                if (stringTuple2Tuple2._2()._2().isPresent()) {
+//                    double dividend = stringTuple2Tuple2._2()._1();
+//                    double divisor = stringTuple2Tuple2._2()._2().get();
+//                    double value = 0.0;
+//                    if (operation.equals(TopicConstant.MatrixOperation.Divide)) {
+//                        value = dividend / divisor;
+//                    } else if (operation.equals(TopicConstant.MatrixOperation.Mutiply)) {
+//                        value = dividend * divisor;
+//                    }
+//                    entryList.add(new MatrixEntry(Long.parseLong(loc[0]), Long.parseLong(loc[1]), value));
+//                }
+//                for (MatrixEntry mat:entryList) {
+//                    System.out.println("tuple iterator:("+mat.i()+","+mat.j()+")");
+//                }
+//                return entryList.iterator();
+//            }
+//        }
+//        JavaRDD<MatrixEntry> resultRDD = tmpRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(operation));
+     //JavaPairRDD<Object,DenseVector<Object>> resultRDD = tmpRDD.mapToPair();
+
+     //JavaPairRDD<Object,DenseVector<Object>> resultRDD = tmpRDD.mapToPair(new Tuple2DenseVectorPairFunction(operation));
+
+     JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> resultRDD = tmpRDD.flatMap(new Tuple2DenseVectorPairFunction(operation));
+
+//        CoordinateMatrix resultMat = new CoordinateMatrix(resultRDD.rdd());
+//        logger.info("getCoorMatOption end!");
+//        return resultMat;
+        //resultRDD.collect();
+        CoordinateMatrix coordinateMatrix = new CoordinateMatrix(resultRDD.rdd());
+        logger.info("getCoorMatOption finish");
+        System.out.println("getCoorMatOption finish");
+        return coordinateMatrix.toDenseVecMatrix();
     }
 
     public static double getRandomValue(double max) {
@@ -306,5 +309,60 @@ public class TopicUtil {
         }
 
         return topicWordList;
+    }
+
+    private static class Tuple2DenseVectorPairFunction implements FlatMapFunction<Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>>,Tuple2<Tuple2<Object, Object>, Object>> {
+        private final TopicConstant.MatrixOperation operation;
+        public Tuple2DenseVectorPairFunction(TopicConstant.MatrixOperation operation) {
+            this.operation = operation;
+        }
+
+//            public Iterator<MatrixEntry> call(Tuple2<String, Tuple2<Double, Optional<Double>>> stringTuple2Tuple2) throws Exception {
+//                List<MatrixEntry> entryList = new ArrayList<MatrixEntry>();
+//                String[] loc = stringTuple2Tuple2._1().split(TopicConstant.COMMA_DELIMITER);
+//                if (stringTuple2Tuple2._2()._2().isPresent()) {
+//                    double dividend = stringTuple2Tuple2._2()._1();
+//                    double divisor = stringTuple2Tuple2._2()._2().get();
+//                    double value = 0.0;
+//                    if (operation.equals(TopicConstant.MatrixOperation.Divide)) {
+//                        value = dividend / divisor;
+//                    } else if (operation.equals(TopicConstant.MatrixOperation.Mutiply)) {
+//                        value = dividend * divisor;
+//                    }
+//                    entryList.add(new MatrixEntry(Long.parseLong(loc[0]), Long.parseLong(loc[1]), value));
+//                }
+//                for (MatrixEntry mat:entryList) {
+//                    System.out.println("tuple iterator:("+mat.i()+","+mat.j()+")");
+//                }
+//                return entryList.iterator();
+//            }
+
+
+
+        @Override
+        public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>> tuple2){
+            Long rowNo = (Long) tuple2._1();
+            ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
+            Tuple2<Object,Object> locTuple;
+            Float flt;
+            if(tuple2._2()._2().isPresent()){
+                double[] dividendArray =  (double[]) ((ArrayList<Object>)tuple2._2()._1()).get(0);
+                double[] divisorArray = (double[]) (((ArrayList<Object>)tuple2._2()._2().get()).get(0));
+                logger.info("dividend array length:"+dividendArray.length);
+                logger.info("divisor array length:"+divisorArray.length);
+                for (int idx=0;idx<dividendArray.length;idx++){
+                    locTuple = new Tuple2<Object, Object>(rowNo,Long.valueOf(idx));
+                    if(operation.equals(TopicConstant.MatrixOperation.Divide)){
+                        flt = Double.valueOf((double)dividendArray[idx] /(double) divisorArray[idx]).floatValue();
+                        tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple,flt));
+                    }else if(operation.equals(TopicConstant.MatrixOperation.Mutiply)){
+                        flt = Double.valueOf((double) dividendArray[idx] * (double) divisorArray[idx]).floatValue();
+                        tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple, flt));
+                    }
+                }
+            }
+            //Double[] resultDBArray = Arrays.copyOfRange(operationArray.toArray(new Double[operationArray.size()]),0,operationArray.size());
+            return tuple2s.iterator();
+        }
     }
 }

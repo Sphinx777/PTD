@@ -1,5 +1,7 @@
 package util.tfidf;
 
+import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
+import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -11,8 +13,6 @@ import org.apache.spark.ml.feature.RegexTokenizer;
 import org.apache.spark.ml.feature.StopWordsRemover;
 import org.apache.spark.ml.feature.Tokenizer;
 import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
-import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.util.CollectionAccumulator;
@@ -26,7 +26,7 @@ public class TFIDF implements Serializable{
 
 	private Dataset<Row> tweetDataset;
 	private Dataset<Row> tfidfDataSet;
-	private CoordinateMatrix CoorMatOfTFIDF;
+	private DenseVecMatrix tfidfDVM;
 	private HashMap<String,String> tweetIDMap = new HashMap<String,String>();
 	public Dataset<Row> getTfidfDataSet() {
 		return tfidfDataSet;
@@ -89,7 +89,7 @@ public class TFIDF implements Serializable{
 			logger.info("index:"+tf.indexOf(obj.toString())+",word:"+obj.toString());
             tmpTweetIDMap.put(String.valueOf(tf.indexOf(obj.toString())), obj.toString()); //ok to broadcast
 			if(!tweetWordMap.containsValue(obj.toString())){
-				idxCnt = Long.valueOf(tweetWordMap.size()+1);
+				idxCnt = Long.valueOf(tweetWordMap.size());
                 tweetWordMap.put(String.valueOf(idxCnt) , obj.toString());
 			}
 		}
@@ -101,14 +101,16 @@ public class TFIDF implements Serializable{
 		JavaRDD<org.apache.spark.mllib.linalg.Vector> tfIdfs = idfMllib.fit(termFreqs).transform(termFreqs);
 
 		JavaPairRDD<org.apache.spark.mllib.linalg.Vector,Long> tfidfPairRDD = tfIdfs.zipWithIndex();
-		tfidfPairRDD.foreach(new VoidFunction<Tuple2<org.apache.spark.mllib.linalg.Vector, Long>>() {
+		/*tfidfPairRDD.foreach(new VoidFunction<Tuple2<org.apache.spark.mllib.linalg.Vector, Long>>() {
 			@Override
 			public void call(Tuple2<Vector, Long> vectorLongTuple2) throws Exception {
                 System.out.println("vectorLongTuple2 for collect:"+vectorLongTuple2._1()+","+vectorLongTuple2._2());
 			}
-		});
+		});*/
 		//tfidfPairRDD.collect();
-		JavaRDD<MatrixEntry> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
+		//JavaRDD<MatrixEntry> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
+
+		JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
 
 //		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
 //															   @Override
@@ -137,11 +139,11 @@ public class TFIDF implements Serializable{
 //														   });
 		tweetIDMap = brTweetWordMap.getValue();
 
-		for(Map.Entry<String,String> entry:tweetIDMap.entrySet()){
+		/*for(Map.Entry<String,String> entry:tweetIDMap.entrySet()){
 			System.out.println("tweetIDMap["+entry.getKey()+"]:"+entry.getValue());
 			logger.info("tweetIDMap["+entry.getKey()+"]:"+entry.getValue());
-		}
-		entryJavaRDD.collect();
+		}*/
+		//entryJavaRDD.collect();
 
 		//tfidf for ml end
 
@@ -207,18 +209,19 @@ public class TFIDF implements Serializable{
 //		});
 
 		//print the matrixEntry array
-//		CoorMatOfTFIDF.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
+//		tfidfDVM.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
 //			@Override
 //			public void call(MatrixEntry matrixEntry) throws Exception {
 //				System.out.println(matrixEntry.i()+","+matrixEntry.j()+":"+matrixEntry.value());
 //			}
 //		});
-		CoorMatOfTFIDF = new CoordinateMatrix(entryJavaRDD.rdd());
-		//System.out.println(CoorMatOfTFIDF.entries().count());
+		CoordinateMatrix coordinateMatrix = new CoordinateMatrix(entryJavaRDD.rdd());
+		tfidfDVM = coordinateMatrix.toDenseVecMatrix();
+		//System.out.println(tfidfDVM.entries().count());
 	}
 	//x:tweet Id , y:term id(features--vector) , value:tfidf(features--vector)
-	public CoordinateMatrix getCoorMatOfTFIDF(){
-		return CoorMatOfTFIDF;
+	public DenseVecMatrix getTfidfDVM(){
+		return tfidfDVM;
 	}
 	public HashMap<String, String> getTweetIDMap() {
 		return tweetIDMap;
@@ -261,7 +264,7 @@ public class TFIDF implements Serializable{
 		}
 	}
 
-    private class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<Vector, Long>, MatrixEntry> {
+    private class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<Vector, Long>, Tuple2<Tuple2<Object, Object>, Object>> {
         private Broadcast<HashMap<String,String>> tweetIDMapBroadCast;
         private Broadcast<HashMap<String,String>> tweetWordMapBroadCast;
 
@@ -271,39 +274,74 @@ public class TFIDF implements Serializable{
         }
 
         @Override
-        public Iterator<MatrixEntry> call(Tuple2<Vector, Long> vectorLongTuple2) throws Exception {
-            List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
-            long matrixIdx = 0;
-            logger.info("vectorLongTuple2:" + vectorLongTuple2._1() + "," + vectorLongTuple2._2());
-            System.out.println("vectorLongTuple2:" + vectorLongTuple2._1() + "," + vectorLongTuple2._2());
-            for (int i : vectorLongTuple2._1().toSparse().indices()) {
-                logger.info("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
-                logger.info("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
-                logger.info("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+		public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Vector,Long> vectorLongTuple2)throws Exception {
+			TreeMap<Long, Double> wordMap = new TreeMap<>();
+			long matrixIdx = 0;
+			ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
+			Tuple2<Object,Object> locTuple;
+			for (int i : vectorLongTuple2._1().toSparse().indices()) {
+				//logger.info("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+				//logger.info("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+				//logger.info("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
 
-                System.out.println("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
-                System.out.println("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
-                System.out.println("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
-                if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {
-                    System.out.println("tweetWordMapBroadCast contains no value error!");
-                    logger.info("tweetWordMapBroadCast contains no value error!");
-                    //matrixIdx = Long.valueOf(tweetWordMapBroadCast.getValue().size()+1);
-                    //tweetWordMapBroadCast.getValue().put(String.valueOf(matrixIdx) , tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
-                } else {
-                    Iterator<Map.Entry<String, String>> iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
-                    while (iter.hasNext()) {
-                        Map.Entry<String, String> entry = iter.next();
-                        if (entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))) {
-                            matrixIdx = Long.valueOf(entry.getKey());
-                            break;
-                        }
-                    }
-                }
-                logger.info("arrayList.add[" + (vectorLongTuple2._2().longValue() + 1) + "," + matrixIdx + "]:" + vectorLongTuple2._1().toArray()[i]);
-                System.out.println("arrayList.add[" + (vectorLongTuple2._2().longValue() + 1) + "," + matrixIdx + "]:" + vectorLongTuple2._1().toArray()[i]);
-                arrayList.add(new MatrixEntry(vectorLongTuple2._2().longValue() + 1, matrixIdx, vectorLongTuple2._1().toArray()[i]));
-            }
-            return arrayList.iterator();
-        }
+				//System.out.println("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+				//System.out.println("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+				//System.out.println("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+				if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {
+					System.out.println("tweetWordMapBroadCast contains no value error!");
+					logger.info("tweetWordMapBroadCast contains no value error!");
+					//matrixIdx = Long.valueOf(tweetWordMapBroadCast.getValue().size()+1);
+					//tweetWordMapBroadCast.getValue().put(String.valueOf(matrixIdx) , tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+				} else {
+					Iterator<Map.Entry<String, String>> iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
+					while (iter.hasNext()) {
+						Map.Entry<String, String> entry = iter.next();
+						if (entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))) {
+							matrixIdx = Long.valueOf(entry.getKey());
+							locTuple = new Tuple2<Object, Object>(vectorLongTuple2._2().longValue(),matrixIdx);
+							tuple2s.add(new Tuple2<Tuple2<Object, Object>,Object>(locTuple, Double.valueOf(vectorLongTuple2._1().toArray()[i]).floatValue()));
+							break;
+						}
+					}
+				}
+			}
+
+			return tuple2s.iterator();
+		}
+//        @Override
+//        public Iterator<MatrixEntry> call(Tuple2<Vector, Long> vectorLongTuple2) throws Exception {
+//            List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+//            long matrixIdx = 0;
+//            logger.info("vectorLongTuple2:" + vectorLongTuple2._1() + "," + vectorLongTuple2._2());
+//            System.out.println("vectorLongTuple2:" + vectorLongTuple2._1() + "," + vectorLongTuple2._2());
+//            for (int i : vectorLongTuple2._1().toSparse().indices()) {
+//                logger.info("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+//                logger.info("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+//                logger.info("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+//
+//                System.out.println("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+//                System.out.println("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+//                System.out.println("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+//                if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {
+//                    System.out.println("tweetWordMapBroadCast contains no value error!");
+//                    logger.info("tweetWordMapBroadCast contains no value error!");
+//                    //matrixIdx = Long.valueOf(tweetWordMapBroadCast.getValue().size()+1);
+//                    //tweetWordMapBroadCast.getValue().put(String.valueOf(matrixIdx) , tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+//                } else {
+//                    Iterator<Map.Entry<String, String>> iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
+//                    while (iter.hasNext()) {
+//                        Map.Entry<String, String> entry = iter.next();
+//                        if (entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))) {
+//                            matrixIdx = Long.valueOf(entry.getKey());
+//                            break;
+//                        }
+//                    }
+//                }
+//                logger.info("arrayList.add[" + (vectorLongTuple2._2().longValue() + 1) + "," + matrixIdx + "]:" + vectorLongTuple2._1().toArray()[i]);
+//                System.out.println("arrayList.add[" + (vectorLongTuple2._2().longValue() + 1) + "," + matrixIdx + "]:" + vectorLongTuple2._1().toArray()[i]);
+//                arrayList.add(new MatrixEntry(vectorLongTuple2._2().longValue() + 1, matrixIdx, vectorLongTuple2._1().toArray()[i]));
+//            }
+//            return arrayList.iterator();
+//        }
     }
 }

@@ -1,274 +1,259 @@
 package util.nmf;
 
+import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
+import edu.nju.pasalab.marlin.utils.MTUtils;
+import edu.nju.pasalab.marlin.utils.UniformGenerator;
 import org.apache.log4j.Logger;
-import org.apache.spark.Accumulator;
-import org.apache.spark.mllib.linalg.distributed.BlockMatrix;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.storage.StorageLevel;
-import org.apache.spark.util.AccumulatorV2;
 import util.MeasureUtil;
 import util.TopicConstant;
 import util.TopicUtil;
-import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.function.FlatMapFunction;
-import org.apache.spark.api.java.function.VoidFunction;
-import org.apache.spark.mllib.linalg.Vector;
-import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
-import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
-import org.apache.spark.sql.Encoders;
-import org.apache.spark.util.LongAccumulator;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 
 public class NMF implements Serializable {
 	private double initialNum = 0.01;
 	private long numRows , numCols;
-	//private DenseMatrix W,H,minW,minH;
-	private CoordinateMatrix V , W , H , minW , minH;
+	//private DenseMatrix originalW,originalH,minW,minH;
+	private DenseVecMatrix V , originalW, originalH, minW , minH , newW, newH;
 	//static double tmpKLDivergence = 0.0;
-    static double minKLDivergence = Double.MAX_VALUE;
+    static double minKLDivergence = java.lang.Double.MAX_VALUE;
 	private boolean boolUpdateW;
 	private SparkSession sparkSession;
 	private int numFactors;
 	private int numIters;
     static Logger logger = Logger.getLogger(NMF.class.getName());
 
-	public NMF(CoordinateMatrix matV,boolean isUpdateW,SparkSession paraSparkSession , int paraNumFactors , int paraNumIters) {
+	public NMF(DenseVecMatrix matV, boolean isUpdateW, SparkSession paraSparkSession , int paraNumFactors , int paraNumIters) {
 		V = matV;
 		boolUpdateW = isUpdateW;
-		minKLDivergence = Double.MAX_VALUE;
+		minKLDivergence = java.lang.Double.MAX_VALUE;
 		//initialize to zero or other method
 		//double[] dbArray =new double[(int)(V.numRows() * numFactors)];
         //Arrays.fill(dbArray,0.01);
 		this.sparkSession = paraSparkSession;
-		final LongAccumulator rowAccumulator = sparkSession.sparkContext().longAccumulator("rowAccumulator");
-		final LongAccumulator colAccumulator = sparkSession.sparkContext().longAccumulator("colAccumulator");
+		//final LongAccumulator rowAccumulator = sparkSession.sparkContext().longAccumulator("rowAccumulator");
+		//final LongAccumulator colAccumulator = sparkSession.sparkContext().longAccumulator("colAccumulator");
 
         numRows = V.numRows();
 		numCols = V.numCols();
-		List<Double> tmpDBList= new ArrayList<Double>();
+		//List<Double> tmpDBList= new ArrayList<Double>();
 		numFactors = paraNumFactors;
 		numIters = paraNumIters;
 
         logger.info("set dummy factor row!");
-		//dummy factor row
-		for (int i = 0; i< numFactors; i++){
-			tmpDBList.add((double) i);
-		}
-
-		JavaRDD<Double> tmpWRDD = sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
-
-        logger.info("set matrix Entry!");
-		//JavaRDD<MatrixEntry> tmpWEntryRDD = tmpWRDD.flatMap(new DoubleMatrixEntryFlatMapFunction(rowAccumulator, factorAccumulator));
-        JavaRDD<MatrixEntry> tmpWEntryRDD = tmpWRDD.flatMap(new FlatMapFunction<Double, MatrixEntry>() {
-            @Override
-            public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
-                List<MatrixEntry> tmpList = new ArrayList<MatrixEntry>();
-                rowAccumulator.reset();
-                for (int i=0;i<numRows;i++){
-                    //normal
-                    tmpList.add(new MatrixEntry(rowAccumulator.value(), aDouble.longValue(), TopicUtil.getRandomValue(initialNum)));
-                    rowAccumulator.add(1);
-                }
-
-                return tmpList.iterator();
-            }
-        });
-
-//		JavaRDD<MatrixEntry> tmpWEntryRDD1 = tmpWEntryRDD.map(new Function<MatrixEntry, MatrixEntry>() {
-//			@Override
-//			public MatrixEntry call(MatrixEntry matrixEntry) throws Exception {
-//				//System.out.println("i:"+matrixEntry.i()+",j:"+matrixEntry.j());
-//				return new MatrixEntry(matrixEntry.i(),matrixEntry.j(),0.01);
-//			}
-//		});
-
-//        tmpWEntryRDD.foreach(new VoidFunction<MatrixEntry>() {
+        System.out.println("set dummy factor row!");
+        //dummy factor row
+		//old
+//		for (int i = 0; i< numFactors; i++){
+//			tmpDBList.add((double) i);
+//		}
+//
+//		JavaRDD<Double> tmpWRDD = sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
+//
+//        logger.info("set matrix Entry!");
+//
+//        JavaRDD<MatrixEntry> tmpWEntryRDD = tmpWRDD.flatMap(new FlatMapFunction<Double, MatrixEntry>() {
 //            @Override
-//            public void call(MatrixEntry matrixEntry) throws Exception {
-//                System.out.println("W entry:("+matrixEntry.i()+","+matrixEntry.j()+")--"+matrixEntry.value());
-//                logger.info("W entry:("+matrixEntry.i()+","+matrixEntry.j()+")--"+matrixEntry.value());
+//            public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
+//                List<MatrixEntry> tmpList = new ArrayList<MatrixEntry>();
+//                rowAccumulator.reset();
+//                for (int i=0;i<numRows;i++){
+//                    //normal
+//                    tmpList.add(new MatrixEntry(rowAccumulator.value(), aDouble.longValue(), TopicUtil.getRandomValue(initialNum)));
+//                    rowAccumulator.add(1);
+//                }
+//
+//                return tmpList.iterator();
 //            }
-//    });
-//        System.out.println(tmpWEntryRDD.count());
-//        logger.info("W.entry count:"+tmpWEntryRDD.count());
+//        });
 
 		if(boolUpdateW) {
-            logger.info("update The W!");
-			tmpWEntryRDD.persist(StorageLevel.MEMORY_ONLY_SER());
-			W = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
-			minW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
-			//System.out.println(W.entries().count());
+            logger.info("update The originalW!");
+            System.out.println("update The originalW!");
+            //old
+			//tmpWEntryRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+			//originalW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
+			//minW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
+
+			//new
+			originalW = MTUtils.randomDenVecMatrix(sparkSession.sparkContext(),numRows,numFactors,0,new UniformGenerator(0.0, 1.0));
+			minW = originalW;
 		}
-		tmpDBList = new ArrayList<Double>();
-		for (int i = 0; i< numFactors; i++){
-			tmpDBList.add((double) i);
-		}
 
-		JavaRDD<Double> tmpHRDD = sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
-
-        logger.info("set tmp H entry!");
-        JavaRDD<MatrixEntry> tmpHEntryRDD = tmpHRDD.flatMap(new FlatMapFunction<Double, MatrixEntry>() {
-			@Override
-			public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
-				List<MatrixEntry> tmpList = new ArrayList<MatrixEntry>();
-				colAccumulator.reset();
-				for (int i=0;i<numCols;i++){
-					//normal
-					tmpList.add(new MatrixEntry(aDouble.longValue(),colAccumulator.value(),TopicUtil.getRandomValue(initialNum)));
-					colAccumulator.add(1);
-				}
-				return tmpList.iterator();
-			}
-		});
-
-//		JavaRDD<MatrixEntry> tmpHEntryRDD1 = tmpHEntryRDD.map(new Function<MatrixEntry, MatrixEntry>() {
+		//old
+//		tmpDBList = new ArrayList<Double>();
+//		for (int i = 0; i< numFactors; i++){
+//			tmpDBList.add((double) i);
+//		}
+//
+//		JavaRDD<Double> tmpHRDD = sparkSession.createDataset(tmpDBList, Encoders.DOUBLE()).toJavaRDD();
+//
+//        logger.info("set tmp originalH entry!");
+//        JavaRDD<MatrixEntry> tmpHEntryRDD = tmpHRDD.flatMap(new FlatMapFunction<Double, MatrixEntry>() {
 //			@Override
-//			public MatrixEntry call(MatrixEntry matrixEntry) throws Exception {
-//				//System.out.println("i:"+matrixEntry.i()+",j:"+matrixEntry.j());
-//				return new MatrixEntry(matrixEntry.i(),matrixEntry.j(),0.01);
+//			public Iterator<MatrixEntry> call(Double aDouble) throws Exception {
+//				List<MatrixEntry> tmpList = new ArrayList<MatrixEntry>();
+//				colAccumulator.reset();
+//				for (int i=0;i<numCols;i++){
+//					//normal
+//					tmpList.add(new MatrixEntry(aDouble.longValue(),colAccumulator.value(),TopicUtil.getRandomValue(initialNum)));
+//					colAccumulator.add(1);
+//				}
+//				return tmpList.iterator();
 //			}
 //		});
+//
+//		tmpHEntryRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+//		originalH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
+//		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
 
-		//System.out.println("tmpHEntryRDD:"+tmpHEntryRDD.count());
-		tmpHEntryRDD.persist(StorageLevel.MEMORY_ONLY_SER());
-		H = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
-		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
-		//System.out.println(H.entries().count());
-//		tmpHEntryRDD.foreach(new VoidFunction<MatrixEntry>() {
-//			@Override
-//			public void call(MatrixEntry matrixEntry) throws Exception {
-//				System.out.println("H entry:("+matrixEntry.i()+","+matrixEntry.j()+")--"+matrixEntry.value());
-//				logger.info("H entry:("+matrixEntry.i()+","+matrixEntry.j()+")--"+matrixEntry.value());
-//			}
-//		});
-//		System.out.println(tmpHEntryRDD.count());
-		logger.info("print H entry!");
-//		H.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
-//			@Override
-//			public void call(Vector vector) throws Exception {
-//				System.out.println(vector);
-//			}
-//		});
+		//new
+		originalH = MTUtils.randomDenVecMatrix(sparkSession.sparkContext(),numFactors,Long.valueOf(numCols).intValue(),0,new UniformGenerator(0.0, 1.0));
+		minH = originalH;
+
         logger.info("NMF initial function finish");
-	}
+        System.out.println("NMF initial function finish");
+    }
 
-	//update W,H
+	//update originalW,originalH
 	public void buildNMFModel(){
 		final ArrayList<Double> tmpKLDivergenceList = new ArrayList<Double>();
 		for(int iter=0;iter< numIters;iter++) {
-            //logger.info("V.toRowMatrix after iter "+ iter +":"+V.toBlockMatrix().numRows()+","+V.toBlockMatrix().numCols());
-            //logger.info("H.toBlock after iter "+ iter +":"+H.toBlockMatrix().numRows()+","+H.toBlockMatrix().numCols());
-            //logger.info("W.toBlock after iter "+iter+":"+W.toBlockMatrix().numRows()+","+W.toBlockMatrix().numCols());
-            //logger.info("W.transpose().toBlockMatrix().multiply(V.toBlockMatrix()):"+W.transpose().toBlockMatrix().multiply(V.toBlockMatrix()).toCoordinateMatrix().numRows()+","+W.transpose().toBlockMatrix().multiply(V.toBlockMatrix()).toCoordinateMatrix().numCols());
-            //logger.info("W.transpose().toBlockMatrix().multiply(W.toBlockMatrix()).multiply(H.toBlockMatrix()):"+W.transpose().toBlockMatrix().multiply(W.toBlockMatrix()).multiply(H.toBlockMatrix()).toCoordinateMatrix().numRows()+","+W.transpose().toBlockMatrix().multiply(W.toBlockMatrix()).multiply(H.toBlockMatrix()).toCoordinateMatrix().numCols());
+//
+//			BlockMatrix wBkMat = originalW.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
+//			BlockMatrix wTransBkMat = originalW.transpose().toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
+//			BlockMatrix vBkMat = V.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
+//			BlockMatrix hBkMat = originalH.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
+//			BlockMatrix hTranBkMat = originalH.transpose().toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
+//
+//            CoordinateMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, wTransBkMat.multiply(vBkMat), wTransBkMat.multiply(wBkMat).multiply(hBkMat));
 
-//            W.transpose().toBlockMatrix().multiply(V.toBlockMatrix()).toCoordinateMatrix().entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
-//                @Override
-//                public void call(MatrixEntry matrixEntry) throws Exception {
-//                    System.out.println("W.tran1:("+matrixEntry.i()+","+matrixEntry.j()+")");
-//                }
-//            });
+            //logger.info("start to compute H--W:"+originalW.numRows()+","+originalW.numCols()+";H:"+originalH.numRows()+","+originalH.numCols());
+            System.out.println("start to compute H");
+            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,originalW.transpose().toBlockMatrix(1,1).multiply(V.toBlockMatrix(1,1)).toDenseVecMatrix(),originalW.transpose().toBlockMatrix(1,1).multiply(originalW.toBlockMatrix(1,1)).multiply(originalH.toBlockMatrix(1,1)).toDenseVecMatrix());
+		    HUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+            newH = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalH, HUpdateMatrix);
+            newH.rows().persist(StorageLevel.MEMORY_ONLY());
+            logger.info("compute H finish");
+            System.out.println("compute H finish");
 
-//            W.transpose().toBlockMatrix().multiply(W.toBlockMatrix()).multiply(H.toBlockMatrix()).toCoordinateMatrix().entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
-//                @Override
-//                public void call(MatrixEntry matrixEntry) throws Exception {
-//                    System.out.println("W.tran2:("+matrixEntry.i()+","+matrixEntry.j()+")");
-//                }
-//            });
-			BlockMatrix wBkMat = W.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-			BlockMatrix wTransBkMat = W.transpose().toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-			BlockMatrix vBkMat = V.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-			BlockMatrix hBkMat = H.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-			BlockMatrix hTranBkMat = H.transpose().toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
+//            if(boolUpdateW) {
+//                CoordinateMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, vBkMat.multiply(hTranBkMat), wBkMat.multiply(hBkMat).multiply(hTranBkMat));
+//                originalW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalW.toBlockMatrix(), WUpdateMatrix.toBlockMatrix());
+//            }
+            if(boolUpdateW){
+                //logger.info("start to compute W--W:"+originalW.numRows()+","+originalW.numCols()+";H:"+originalH.numRows()+","+originalH.numCols());
+                System.out.println("start to compute W");
 
-            CoordinateMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, wTransBkMat.multiply(vBkMat), wTransBkMat.multiply(wBkMat).multiply(hBkMat));
-//            HUpdateMatrix.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
-//				@Override
-//				public void call(Vector vector) throws Exception {
-//					System.out.println("HU vector:"+vector);
-//				}
-//			});
-
-            //logger.info("HU.toRowMatrix after multiply iter "+ iter +":"+HUpdateMatrix.toBlockMatrix().numRows()+","+HUpdateMatrix.toBlockMatrix().numCols());
-
-			H = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, H.toBlockMatrix(), HUpdateMatrix.toBlockMatrix());
-
-            if(boolUpdateW) {
-				//logger.info("V.toBlockMatrix after multiply iter "+iter+":"+V.toBlockMatrix().numRows()+","+V.toBlockMatrix().numCols());
-				//logger.info("H.trans.toBlock after multiply iter "+iter+":"+H.transpose().toBlockMatrix().numRows()+","+H.transpose().toBlockMatrix().numCols());
-				//logger.info("W.toBlock after multiply iter "+iter+":"+W.toBlockMatrix().numRows()+","+W.toBlockMatrix().numCols());
-
-                CoordinateMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, vBkMat.multiply(hTranBkMat), wBkMat.multiply(hBkMat).multiply(hTranBkMat));
-                W = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, W.toBlockMatrix(), WUpdateMatrix.toBlockMatrix());
-            }
-			//System.out.println(H.entries().count());
-			//System.out.println(W.entries().count());
-
-			//compute KL Divergence
-			double tmpKLDivergence = MeasureUtil.getKLDivergence(vBkMat,wBkMat,hBkMat,sparkSession);
-			//System.out.println(tmpKLDivergence);
+//				originalW.rows().toJavaRDD().foreach(new VoidFunction<Tuple2<Object, DenseVector<Object>>>() {
+//					@Override
+//					public void call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+//						ArrayList<Object> arrayList = new ArrayList<Object>();
+//						Collections.addAll(arrayList,objectDenseVectorTuple2._2().data());
+//						logger.info("oriW_row_length:"+objectDenseVectorTuple2._1()+","+((double[])arrayList.get(0)).length);
+//						for (double db:(double[]) arrayList.get(0)){
+//							logger.info("originalW value:"+db);
+//						}
+//					}
+//				});
+//
+//				originalH.rows().toJavaRDD().foreach(new VoidFunction<Tuple2<Object, DenseVector<Object>>>() {
+//					@Override
+//					public void call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+//						ArrayList<Object> arrayList = new ArrayList<Object>();
+//						Collections.addAll(arrayList,objectDenseVectorTuple2._2().data());
+//						logger.info("oriH_row_length:"+objectDenseVectorTuple2._1()+","+((double[])arrayList.get(0)).length);
+//						for (double db:(double[]) arrayList.get(0)){
+//							logger.info("originalH value:"+db);
+//						}
+//					}
+//				});
+//				DenseVecMatrix front = (DenseVecMatrix) originalW.multiply(originalH, TopicConstant.cores);
+//				front.rows().toJavaRDD().foreach(new VoidFunction<Tuple2<Object, DenseVector<Object>>>() {
+//					@Override
+//					public void call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+//						ArrayList<Object> arrayList = new ArrayList<Object>();
+//						Collections.addAll(arrayList,objectDenseVectorTuple2._2().data());
+//						logger.info("front_row_length:"+objectDenseVectorTuple2._1()+","+((double[])arrayList.get(0)).length);
+//						for (double db:(double[]) arrayList.get(0)){
+//							logger.info("front value:"+db);
+//						}
+//					}
+//				});
+//				logger.info("front:"+front.numRows()+","+front.numCols());
+//				DenseVecMatrix tmpWUpdate2 = (DenseVecMatrix) ((DenseVecMatrix) originalW.multiply(originalH, TopicConstant.cores)).multiply(originalH.transpose(),TopicConstant.cores);
+//				logger.info("tmpWUpdate2 row length:"+tmpWUpdate2.numRows());
+//
+//				tmpWUpdate2.rows().toJavaRDD().foreach(new VoidFunction<Tuple2<Object, DenseVector<Object>>>() {
+//					@Override
+//					public void call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+//						ArrayList<Object> arrayList = new ArrayList<Object>();
+//						Collections.addAll(arrayList,objectDenseVectorTuple2._2().data());
+//						logger.info("w update2 tuple length:"+((double[])arrayList.get(0)).length);
+//					}
+//				});
+//				tmpWUpdate2.rows().toJavaRDD().collect();
+                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, V.toBlockMatrix(1,1).multiply(originalH.transpose().toBlockMatrix(1,1)).toDenseVecMatrix(),originalW.toBlockMatrix(1,1).multiply(originalH.toBlockMatrix(1,1)).multiply(originalH.transpose().toBlockMatrix(1,1)).toDenseVecMatrix());
+                WUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+                newW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalW,WUpdateMatrix);
+                newW.rows().persist(StorageLevel.MEMORY_ONLY());
+                logger.info("compute W finish");
+                System.out.println("compute W finish");
+            }else{
+				newW = originalW;
+			}
+//
+//			//compute KL Divergence
+//			double tmpKLDivergence = MeasureUtil.getKLDivergence(vBkMat,wBkMat,hBkMat,sparkSession);
+            double tmpKLDivergence = MeasureUtil.getKLDivergence(V, newW, newH);
+            logger.info("getKLDivergence: "+tmpKLDivergence);
+            System.out.println("getKLDivergence: "+tmpKLDivergence);
+//			//System.out.println(tmpKLDivergence);
 			tmpKLDivergenceList.add(tmpKLDivergence);
 			if(tmpKLDivergence<minKLDivergence){
-				minKLDivergence = tmpKLDivergence;
+                logger.info("minKLDivergence:"+minKLDivergence);
+                System.out.println("minKLDivergence:"+minKLDivergence);
+                minKLDivergence = tmpKLDivergence;
 				//set minW
-                JavaRDD<MatrixEntry> tmpW = W.entries().toJavaRDD().flatMap(new FlatMapFunction<MatrixEntry, MatrixEntry>() {
-					@Override
-					public Iterator<MatrixEntry> call(MatrixEntry matrixEntry) throws Exception {
-						List<MatrixEntry> list = new ArrayList<MatrixEntry>();
-						list.add(matrixEntry);
-						return list.iterator();
-					}
-				});
-				minW = new CoordinateMatrix(tmpW.rdd());
-				//set minH
-				JavaRDD<MatrixEntry> tmpH = H.entries().toJavaRDD().flatMap(new FlatMapFunction<MatrixEntry, MatrixEntry>() {
-					@Override
-					public Iterator<MatrixEntry> call(MatrixEntry matrixEntry) throws Exception {
-						List<MatrixEntry> list = new ArrayList<MatrixEntry>();
-						list.add(matrixEntry);
-						return list.iterator();
-					}
-				});
-				minH = new CoordinateMatrix(tmpH.rdd());
+//                JavaRDD<MatrixEntry> tmpW = originalW.entries().toJavaRDD().flatMap(new FlatMapFunction<MatrixEntry, MatrixEntry>() {
+//					@Override
+//					public Iterator<MatrixEntry> call(MatrixEntry matrixEntry) throws Exception {
+//						List<MatrixEntry> list = new ArrayList<MatrixEntry>();
+//						list.add(matrixEntry);
+//						return list.iterator();
+//					}
+//				});
+//				minW = new CoordinateMatrix(tmpW.rdd());
+                minW = newW;
+//				//set minH
+//				JavaRDD<MatrixEntry> tmpH = originalH.entries().toJavaRDD().flatMap(new FlatMapFunction<MatrixEntry, MatrixEntry>() {
+//					@Override
+//					public Iterator<MatrixEntry> call(MatrixEntry matrixEntry) throws Exception {
+//						List<MatrixEntry> list = new ArrayList<MatrixEntry>();
+//						list.add(matrixEntry);
+//						return list.iterator();
+//					}
+//				});
+//				minH = new CoordinateMatrix(tmpH.rdd());
+                minH = newH;
 			}
-
-//			W.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
-//				@Override
-//				public void call(Vector vector) throws Exception {
-//					System.out.println("W vector:"+vector);
-//				}
-//			});
-
-			//print minH
-//			minH.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
-//				@Override
-//				public void call(Vector vector) throws Exception {
-//					System.out.println("vector:"+vector);
-//				}
-//			});
-
-//			minH.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
-//				@Override
-//				public void call(MatrixEntry matrixEntry) throws Exception {
-//					System.out.println(matrixEntry.i()+","+matrixEntry.j()+":"+matrixEntry.value());
-//				}
-//			});
+			originalH = newH;
+            originalW = newW;
 		}
 	}
 
-	public CoordinateMatrix getW() {
+	public DenseVecMatrix getW() {
 		return minW;
 	}
 
-	public void setW(CoordinateMatrix w) {
-		W = w;
+	public void setW(DenseVecMatrix originalW) {
+		this.originalW = originalW;
 	}
 
-	public CoordinateMatrix getH() {
+	public DenseVecMatrix getH() {
 		return minH;
 	}
 }
