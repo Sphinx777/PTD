@@ -3,14 +3,12 @@ package topicDerivation;
 import breeze.linalg.DenseVector;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
-import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import org.apache.log4j.Logger;
-import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.serializer.KryoRegistrator;
 import org.apache.spark.sql.*;
@@ -60,11 +58,11 @@ public class TopicMain {
                 });
 
                 //for local build
-                //System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+//                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 
                 sparkSession = SparkSession.builder()
                         //for local build
-                        //.master("local")
+//                        .master("local")
                         .appName("TopicDerivation")
                         .config("spark.sql.warehouse.dir", "file:///")
                         .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
@@ -107,7 +105,7 @@ public class TopicMain {
                 System.out.println("compute the mentionMen!");
 
                 //the tweetInfo accumulator
-                CollectionAccumulator<TweetInfo> collectionAccumulator = sc.sc().collectionAccumulator();
+                CollectionAccumulator<TweetInfo> tweetInfoAccumulator = sc.sc().collectionAccumulator();
 
                 //set custom javaRDD and compute the mentionMen
                 JavaRDD<TweetInfo> tweetJavaRDD = currDataset.javaRDD().map(new Function<Row, TweetInfo>() {
@@ -122,7 +120,6 @@ public class TopicMain {
                         tweet.setTweet(row.getAs("tweet").toString());
                         tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
                         tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
-                        collectionAccumulator.add(tweet);
                         return tweet;
                     }
 
@@ -159,8 +156,14 @@ public class TopicMain {
                 });
 
                 tweetJavaRDD.persist(StorageLevel.MEMORY_ONLY());
-                logger.info("tweetJavaRDD count:"+tweetJavaRDD.count());
-                //System.out.println("tweetJavaRDD count:"+tweetJavaRDD.count());
+
+                tweetJavaRDD.foreach(new VoidFunction<TweetInfo>() {
+                    @Override
+                    public void call(TweetInfo tweetInfo) throws Exception {
+                        tweetInfoAccumulator.add(tweetInfo);
+                    }
+                });
+                //logger.info("tweetJavaRDD first id:"+tweetJavaRDD.first().getTweetId());
 
                 Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
                 Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
@@ -200,27 +203,45 @@ public class TopicMain {
                     //JavaPairRDD<Object,ArrayList<Object>> computePORDD = tweetJavaRDD.mapToPair(new JoinMentionString(mentionDataset,(Date) broadcastCurrDate.getValue() , cmdArgs.model));
 
                     //new
-                    JavaPairRDD<Object,ArrayList<Object>> computePORDD = tweetJavaRDD.mapToPair(new JoinMentionString(collectionAccumulator.value(),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
+                    //JavaPairRDD<Object,ArrayList<Double>> computePORDD = tweetJavaRDD.mapToPair(new JoinMentionString(tweetInfoAccumulator.value(),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
 
-                    JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> tweetTuple2RDD = computePORDD.flatMap(new FlatMapFunction<Tuple2<Object, ArrayList<Object>>, Tuple2<Tuple2<Object, Object>, Object>>() {
-                        @Override
-                        public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object, ArrayList<Object>> objectArrayListTuple2) throws Exception {
+                    JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = tweetJavaRDD.map(new JoinMentionString(tweetInfoAccumulator.value(),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
 
-                            ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
-                            for(int i=0;i<objectArrayListTuple2._2().size();i++){
-                                Tuple2<Object,Object> locTuple = new Tuple2<Object, Object>(objectArrayListTuple2._1(),Long.valueOf(Integer.valueOf(i)));
-                                tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple,objectArrayListTuple2._2().toArray()[i]));
-                            }
-                            logger.info("compute flatmap tweet id:"+objectArrayListTuple2._1());
-                            System.out.println("compute flatmap tweet id:"+objectArrayListTuple2._1());
-                            return tuple2s.iterator();
-                        }
-                    });
+                    //coordinate matrix version
+//                    JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> tweetTuple2RDD = computePORDD.flatMap(new FlatMapFunction<Tuple2<Object, ArrayList<Object>>, Tuple2<Tuple2<Object, Object>, Object>>() {
+//                        @Override
+//                        public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object, ArrayList<Object>> objectArrayListTuple2) throws Exception {
+//
+//                            ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
+//                            for(int i=0;i<objectArrayListTuple2._2().size();i++){
+//                                Tuple2<Object,Object> locTuple = new Tuple2<Object, Object>(objectArrayListTuple2._1(),Long.valueOf(Integer.valueOf(i)));
+//                                tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple,objectArrayListTuple2._2().toArray()[i]));
+//                            }
+//                            logger.info("compute flatmap tweet id:"+objectArrayListTuple2._1());
+//                            System.out.println("compute flatmap tweet id:"+objectArrayListTuple2._1());
+//                            return tuple2s.iterator();
+//                        }
+//                    });
+//
+//                    CoordinateMatrix coordinateMatrix = new CoordinateMatrix(tweetTuple2RDD.rdd());
+                    //DenseVecMatrix tweetDVM = coordinateMatrix.toDenseVecMatrix();
 
-                    //tweetTuple2RDD.collect();
-                    //logger.info("tweetTuple2RDD count:"+tweetTuple2RDD.count());
-                    CoordinateMatrix coordinateMatrix = new CoordinateMatrix(tweetTuple2RDD.rdd());
-                    DenseVecMatrix tweetDVM = coordinateMatrix.toDenseVecMatrix();
+                    //DenseVecMatrix version
+//                    JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = computePORDD.map(new Function<Tuple2<Object, ArrayList<Double>>, Tuple2<Object, DenseVector<Object>>>() {
+//                        @Override
+//                        public Tuple2<Object, DenseVector<Object>> call(Tuple2<Object, ArrayList<Double>> v1) throws Exception {
+//                            //keep primitive array to Object
+//                            double [] doubles = new double[v1._2().size()];
+//                            for(int i=0;i<doubles.length;i++){
+//                                doubles[i] = Double.valueOf((Double) v1._2().toArray()[i]).doubleValue();
+//                            }
+//                            List<double[]> list = Arrays.asList(doubles);
+//                            DenseVector<Object> denseVector = new DenseVector<Object>(list.toArray()[0]);
+//                            return new Tuple2<Object, DenseVector<Object>>(v1._1(),denseVector);
+//                        }
+//                    });
+
+                    DenseVecMatrix tweetDVM = new DenseVecMatrix(tuple2JavaRDD.rdd());
 
                     logger.info("set mention entry!");
                     System.out.println("set mention entry!");
@@ -234,7 +255,7 @@ public class TopicMain {
                     logger.info("compute interaction NMF!");
                     System.out.println("compute interaction NMF!");
                     //interaction
-                    NMF interactionNMF = new NMF(tweetDVM, true, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
+                    NMF interactionNMF = new NMF(tweetDVM, true, sc , cmdArgs.numFactors , cmdArgs.numIters , tweetIDAccumulator.value(),tweetIDAccumulator.value());
 
                     logger.info("build NMF model!");
                     System.out.println("build NMF model!");
@@ -251,7 +272,7 @@ public class TopicMain {
                     //Broadcast<HashSet<String>> brHashSet = sc.broadcast(new HashSet<String>());
                     CollectionAccumulator<String> stringAccumulator = sc.sc().collectionAccumulator();
 
-                    tweetIDAccumulator.reset();
+                    //tweetIDAccumulator.reset();
 
                     sentenceData.persist(StorageLevel.MEMORY_ONLY());
                     TFIDF tfidf = new TFIDF(sentenceData,sc, stringAccumulator);
@@ -261,7 +282,7 @@ public class TopicMain {
                     tfidf.buildModel();
                     //old
                     //NMF tfidfNMF = new NMF(tfidf.getTfidfDVM(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
-                    NMF tfidfNMF = new NMF(tfidf.getTfidfDVM(), false, sparkSession , cmdArgs.numFactors , cmdArgs.numIters);
+                    NMF tfidfNMF = new NMF(tfidf.getTfidfDVM(), false, sc, cmdArgs.numFactors , cmdArgs.numIters,tweetIDAccumulator.value(), tfidf.getTweetIDMap().size());
 
                     //System.out.println(W.entries().count());
                     tfidfNMF.setW(W);
@@ -349,18 +370,23 @@ public class TopicMain {
 //                    }
                     logger.info("transform to JSON!");
                     System.out.println("transform to JSON!");
-                    JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap(),cmdArgs.numTopWords));
-                    //System.out.println("jsonRDD count:"+jsonRDD.count());
-                    //logger.info("jsonRDD count:"+jsonRDD.count());
+                    CollectionAccumulator<String[]> topicWordAccumulator = sc.sc().collectionAccumulator();
+                    JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap(),cmdArgs.numTopWords,topicWordAccumulator));
+
                     System.out.println("outFilePath:"+outFilePath);
                     logger.info("outFilePath:"+outFilePath);
-                    //jsonRDD.collect();
                     jsonRDD.coalesce(1,true).saveAsTextFile(outFilePath);
 
                     logger.info("get top topic word list!");
                     System.out.println("get top topic word list!");
-                    JavaRDD<String[]> topicWordRDD = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords));
-                    topicWordList = topicWordRDD.collect();
+
+                    //map version
+                    //JavaRDD<String[]> topicWordRDD = cmpRDD.map(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords,topicWordAccumulator));
+
+                    //foreach version
+                    //cmpRDD.foreach(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords,topicWordAccumulator));
+
+                    topicWordList = topicWordAccumulator.value();
                 } else {
                     //model = "coherence"
                     logger.info("read topic word list!");
@@ -391,7 +417,7 @@ public class TopicMain {
                     logger.info("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
                     System.out.println("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
 
-                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession);
+                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession ,tweetInfoAccumulator.value());
                     if (Double.compare(tmpCoherenceValue, maxCoherenceValue) > 0) {
                         maxCoherenceValue = tmpCoherenceValue;
                     }

@@ -4,8 +4,10 @@ import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import edu.nju.pasalab.marlin.utils.MTUtils;
 import edu.nju.pasalab.marlin.utils.UniformGenerator;
 import org.apache.log4j.Logger;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.storage.StorageLevel;
+import org.apache.spark.util.DoubleAccumulator;
 import util.MeasureUtil;
 import util.TopicConstant;
 import util.TopicUtil;
@@ -15,30 +17,30 @@ import java.util.ArrayList;
 
 public class NMF implements Serializable {
 	private double initialNum = 0.01;
-	private long numRows , numCols;
-	//private DenseMatrix originalW,originalH,minW,minH;
 	private DenseVecMatrix V , originalW, originalH, minW , minH , newW, newH;
-	//static double tmpKLDivergence = 0.0;
     static double minKLDivergence = java.lang.Double.MAX_VALUE;
 	private boolean boolUpdateW;
-	private SparkSession sparkSession;
-	private int numFactors;
+    private JavaSparkContext javaSparkContext;
+    private int numFactors;
 	private int numIters;
+    private DoubleAccumulator doubleAccumulator;
     static Logger logger = Logger.getLogger(NMF.class.getName());
 
-	public NMF(DenseVecMatrix matV, boolean isUpdateW, SparkSession paraSparkSession , int paraNumFactors , int paraNumIters) {
+	public NMF(DenseVecMatrix matV, boolean isUpdateW, JavaSparkContext paraSparkContext , int paraNumFactors , int paraNumIters , long numRows , long numCols) {
 		V = matV;
+        V.rows().persist(StorageLevel.MEMORY_ONLY());
 		boolUpdateW = isUpdateW;
 		minKLDivergence = java.lang.Double.MAX_VALUE;
 		//initialize to zero or other method
 		//double[] dbArray =new double[(int)(V.numRows() * numFactors)];
         //Arrays.fill(dbArray,0.01);
-		this.sparkSession = paraSparkSession;
+		this.javaSparkContext = paraSparkContext;
+        doubleAccumulator = javaSparkContext.sc().doubleAccumulator();
 		//final LongAccumulator rowAccumulator = sparkSession.sparkContext().longAccumulator("rowAccumulator");
 		//final LongAccumulator colAccumulator = sparkSession.sparkContext().longAccumulator("colAccumulator");
 
-        numRows = V.numRows();
-		numCols = V.numCols();
+        //numRows = V.numRows();
+		//numCols = V.numCols();
 		//List<Double> tmpDBList= new ArrayList<Double>();
 		numFactors = paraNumFactors;
 		numIters = paraNumIters;
@@ -79,7 +81,7 @@ public class NMF implements Serializable {
 			//minW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
 
 			//new
-			originalW = MTUtils.randomDenVecMatrix(sparkSession.sparkContext(),numRows,numFactors,0,new UniformGenerator(0.0, 1.0));
+			originalW = MTUtils.randomDenVecMatrix(javaSparkContext.sc(),numRows,numFactors,0,new UniformGenerator(0.0, 1.0));
 			minW = originalW;
 		}
 
@@ -111,7 +113,7 @@ public class NMF implements Serializable {
 //		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
 
 		//new
-		originalH = MTUtils.randomDenVecMatrix(sparkSession.sparkContext(),numFactors,Long.valueOf(numCols).intValue(),0,new UniformGenerator(0.0, 1.0));
+		originalH = MTUtils.randomDenVecMatrix(javaSparkContext.sc(),numFactors,Long.valueOf(numCols).intValue(),0,new UniformGenerator(0.0, 1.0));
 		minH = originalH;
 
         logger.info("NMF initial function finish");
@@ -131,9 +133,14 @@ public class NMF implements Serializable {
 //
 //            CoordinateMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, wTransBkMat.multiply(vBkMat), wTransBkMat.multiply(wBkMat).multiply(hBkMat));
 
+			DenseVecMatrix wTranMatrix = originalW.transpose().toDenseVecMatrix();
+			wTranMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+			DenseVecMatrix hTranMatrix = originalH.transpose().toDenseVecMatrix();
+			hTranMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+
             //logger.info("start to compute H--W:"+originalW.numRows()+","+originalW.numCols()+";H:"+originalH.numRows()+","+originalH.numCols());
             System.out.println("start to compute H");
-            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,originalW.transpose().toBlockMatrix(1,1).multiply(V.toBlockMatrix(1,1)).toDenseVecMatrix(),originalW.transpose().toBlockMatrix(1,1).multiply(originalW.toBlockMatrix(1,1)).multiply(originalH.toBlockMatrix(1,1)).toDenseVecMatrix());
+            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wTranMatrix.multiply(V,TopicConstant.cores),(DenseVecMatrix) ((DenseVecMatrix) wTranMatrix.multiply(originalW,TopicConstant.cores)).multiply(originalH,TopicConstant.cores));
 		    HUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
             newH = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalH, HUpdateMatrix);
             newH.rows().persist(StorageLevel.MEMORY_ONLY());
@@ -196,7 +203,8 @@ public class NMF implements Serializable {
 //					}
 //				});
 //				tmpWUpdate2.rows().toJavaRDD().collect();
-                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, V.toBlockMatrix(1,1).multiply(originalH.transpose().toBlockMatrix(1,1)).toDenseVecMatrix(),originalW.toBlockMatrix(1,1).multiply(originalH.toBlockMatrix(1,1)).multiply(originalH.transpose().toBlockMatrix(1,1)).toDenseVecMatrix());
+
+                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, V.toBlockMatrix(1,1).multiply(hTranMatrix.toBlockMatrix(1,1)).toDenseVecMatrix(),(DenseVecMatrix) ((DenseVecMatrix) originalW.multiply(originalH,TopicConstant.cores)).multiply(hTranMatrix,TopicConstant.cores));
                 WUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
                 newW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalW,WUpdateMatrix);
                 newW.rows().persist(StorageLevel.MEMORY_ONLY());
@@ -208,7 +216,8 @@ public class NMF implements Serializable {
 //
 //			//compute KL Divergence
 //			double tmpKLDivergence = MeasureUtil.getKLDivergence(vBkMat,wBkMat,hBkMat,sparkSession);
-            double tmpKLDivergence = MeasureUtil.getKLDivergence(V, newW, newH);
+            doubleAccumulator.reset();
+            double tmpKLDivergence = MeasureUtil.getKLDivergence(V, newW, newH ,doubleAccumulator);
             logger.info("getKLDivergence: "+tmpKLDivergence);
             System.out.println("getKLDivergence: "+tmpKLDivergence);
 //			//System.out.println(tmpKLDivergence);

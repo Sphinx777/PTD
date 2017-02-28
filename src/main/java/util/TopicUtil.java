@@ -173,6 +173,7 @@ public class TopicUtil {
 //                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
 //            }
 //        });
+tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
 
     JavaPairRDD<Object,ArrayList<Object>> tmpDivisorRDD = matDivisor.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ArrayList<Object>>() {
         @Override
@@ -185,10 +186,11 @@ public class TopicUtil {
         }
     });
 
+        tmpDivisorRDD.persist(StorageLevel.MEMORY_ONLY());
 //        JavaPairRDD<String, Tuple2<Double, Optional<Double>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
 
      JavaPairRDD<Object,Tuple2<ArrayList<Object>, Optional<ArrayList<Object>>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
-
+        tmpRDD.persist(StorageLevel.MEMORY_ONLY());
 //        class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<String, Tuple2<Double, Optional<Double>>>, MatrixEntry> {
 //            private final TopicConstant.MatrixOperation operation;
 
@@ -218,20 +220,33 @@ public class TopicUtil {
 //            }
 //        }
 //        JavaRDD<MatrixEntry> resultRDD = tmpRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(operation));
-     //JavaPairRDD<Object,DenseVector<Object>> resultRDD = tmpRDD.mapToPair();
 
      //JavaPairRDD<Object,DenseVector<Object>> resultRDD = tmpRDD.mapToPair(new Tuple2DenseVectorPairFunction(operation));
 
-     JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> resultRDD = tmpRDD.flatMap(new Tuple2DenseVectorPairFunction(operation));
+        //coordinate matrix version
+        //JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> resultRDD = tmpRDD.flatMap(new Tuple2DenseVectorPairFunction(operation));
+        //denseVecMatrix
+        JavaPairRDD<Object,ArrayList<Object>> resultRDD = tmpRDD.mapToPair(new Tuple2DenseVectorPairFunction(operation));
 
-//        CoordinateMatrix resultMat = new CoordinateMatrix(resultRDD.rdd());
-//        logger.info("getCoorMatOption end!");
-//        return resultMat;
-        //resultRDD.collect();
-        CoordinateMatrix coordinateMatrix = new CoordinateMatrix(resultRDD.rdd());
+        JavaRDD<Tuple2<Object,DenseVector<Object>>> resultRDD2 = resultRDD.map(new Function<Tuple2<Object, ArrayList<Object>>, Tuple2<Object, DenseVector<Object>>>() {
+            @Override
+            public Tuple2<Object, DenseVector<Object>> call(Tuple2<Object, ArrayList<Object>> v1) throws Exception {
+                double [] doubles = new double[v1._2().size()];
+                for(int i=0;i<doubles.length;i++){
+                    doubles[i] = Double.valueOf((Double) v1._2().toArray()[i]).doubleValue();
+                }
+                List<double[]> list = Arrays.asList(doubles);
+                DenseVector<Object> denseVector = new DenseVector<Object>(list.toArray()[0]);
+                return new Tuple2<Object, DenseVector<Object>>(v1._1(),denseVector);
+            }
+        });
+
+        //CoordinateMatrix coordinateMatrix = new CoordinateMatrix(resultRDD.rdd());
+        //DenseVecMatrix denseVecMatrix = coordinateMatrix.toDenseVecMatrix();
+        DenseVecMatrix denseVecMatrix = new DenseVecMatrix(resultRDD2.rdd());
         logger.info("getCoorMatOption finish");
         System.out.println("getCoorMatOption finish");
-        return coordinateMatrix.toDenseVecMatrix();
+        return denseVecMatrix;
     }
 
     public static double getRandomValue(double max) {
@@ -311,7 +326,10 @@ public class TopicUtil {
         return topicWordList;
     }
 
-    private static class Tuple2DenseVectorPairFunction implements FlatMapFunction<Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>>,Tuple2<Tuple2<Object, Object>, Object>> {
+    //coordinate matrix version
+//    private static class Tuple2DenseVectorPairFunction implements FlatMapFunction<Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>>,Tuple2<Tuple2<Object, Object>, Object>> {
+//denseVecMatrix
+    private static class Tuple2DenseVectorPairFunction implements PairFunction<Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>>,Object, ArrayList<Object>> {
         private final TopicConstant.MatrixOperation operation;
         public Tuple2DenseVectorPairFunction(TopicConstant.MatrixOperation operation) {
             this.operation = operation;
@@ -338,31 +356,55 @@ public class TopicUtil {
 //            }
 
 
+//coordinatematrix version
+//        @Override
+//        public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>> tuple2){
+//            Long rowNo = (Long) tuple2._1();
+//            ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
+//            Tuple2<Object,Object> locTuple;
+//            Float flt;
+//            if(tuple2._2()._2().isPresent()){
+//                double[] dividendArray =  (double[]) ((ArrayList<Object>)tuple2._2()._1()).get(0);
+//                double[] divisorArray = (double[]) (((ArrayList<Object>)tuple2._2()._2().get()).get(0));
+//                logger.info("dividend array length:"+dividendArray.length);
+//                logger.info("divisor array length:"+divisorArray.length);
+//                for (int idx=0;idx<dividendArray.length;idx++){
+//                    locTuple = new Tuple2<Object, Object>(rowNo,Long.valueOf(idx));
+//                    if(operation.equals(TopicConstant.MatrixOperation.Divide)){
+//                        flt = Double.valueOf((double)dividendArray[idx] /(double) divisorArray[idx]).floatValue();
+//                        tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple,flt));
+//                    }else if(operation.equals(TopicConstant.MatrixOperation.Mutiply)){
+//                        flt = Double.valueOf((double) dividendArray[idx] * (double) divisorArray[idx]).floatValue();
+//                        tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple, flt));
+//                    }
+//                }
+//            }
+//            return tuple2s.iterator();
+//        }
 
-        @Override
-        public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>> tuple2){
+        //denseVecMatrix
+        public Tuple2<Object,ArrayList<Object>> call(Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>> tuple2){
             Long rowNo = (Long) tuple2._1();
-            ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
-            Tuple2<Object,Object> locTuple;
-            Float flt;
+            ArrayList<Object> tuple2s = new ArrayList<Object>();
+            double flt;
             if(tuple2._2()._2().isPresent()){
                 double[] dividendArray =  (double[]) ((ArrayList<Object>)tuple2._2()._1()).get(0);
                 double[] divisorArray = (double[]) (((ArrayList<Object>)tuple2._2()._2().get()).get(0));
                 logger.info("dividend array length:"+dividendArray.length);
                 logger.info("divisor array length:"+divisorArray.length);
                 for (int idx=0;idx<dividendArray.length;idx++){
-                    locTuple = new Tuple2<Object, Object>(rowNo,Long.valueOf(idx));
                     if(operation.equals(TopicConstant.MatrixOperation.Divide)){
-                        flt = Double.valueOf((double)dividendArray[idx] /(double) divisorArray[idx]).floatValue();
-                        tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple,flt));
+                        flt = Double.valueOf((double)dividendArray[idx] /(double) divisorArray[idx]).doubleValue();
+                        //tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple,flt));
+                        tuple2s.add(flt);
                     }else if(operation.equals(TopicConstant.MatrixOperation.Mutiply)){
-                        flt = Double.valueOf((double) dividendArray[idx] * (double) divisorArray[idx]).floatValue();
-                        tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple, flt));
+                        flt = Double.valueOf((double) dividendArray[idx] * (double) divisorArray[idx]).doubleValue();
+                        //tuple2s.add(new Tuple2<Tuple2<Object, Object>, Object>(locTuple, flt));
+                        tuple2s.add(flt);
                     }
                 }
             }
-            //Double[] resultDBArray = Arrays.copyOfRange(operationArray.toArray(new Double[operationArray.size()]),0,operationArray.size());
-            return tuple2s.iterator();
+            return new Tuple2<Object, ArrayList<Object>>(rowNo,tuple2s);
         }
     }
 }

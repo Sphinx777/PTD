@@ -1,5 +1,6 @@
 package util.tfidf;
 
+import breeze.linalg.DenseVector;
 import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -17,6 +18,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.util.CollectionAccumulator;
 import scala.Tuple2;
+import util.TopicConstant;
 
 import java.io.Serializable;
 import java.util.*;
@@ -110,7 +112,10 @@ public class TFIDF implements Serializable{
 		//tfidfPairRDD.collect();
 		//JavaRDD<MatrixEntry> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
 
-		JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
+        //coordinateMatrix version
+		//JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
+        //denseVecMatrix version
+        JavaRDD<Tuple2<Object,DenseVector<Object>>> entryJavaRDD = tfidfPairRDD.map(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
 
 //		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
 //															   @Override
@@ -215,9 +220,10 @@ public class TFIDF implements Serializable{
 //				System.out.println(matrixEntry.i()+","+matrixEntry.j()+":"+matrixEntry.value());
 //			}
 //		});
-		CoordinateMatrix coordinateMatrix = new CoordinateMatrix(entryJavaRDD.rdd());
-		tfidfDVM = coordinateMatrix.toDenseVecMatrix();
-		//System.out.println(tfidfDVM.entries().count());
+		//coordinateMatrix version
+        //CoordinateMatrix coordinateMatrix = new CoordinateMatrix(entryJavaRDD.rdd());
+		//tfidfDVM = coordinateMatrix.toDenseVecMatrix();
+		tfidfDVM = new DenseVecMatrix(entryJavaRDD.rdd());
 	}
 	//x:tweet Id , y:term id(features--vector) , value:tfidf(features--vector)
 	public DenseVecMatrix getTfidfDVM(){
@@ -264,7 +270,8 @@ public class TFIDF implements Serializable{
 		}
 	}
 
-    private class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<Vector, Long>, Tuple2<Tuple2<Object, Object>, Object>> {
+	//coordinateMatrix version
+    private class Tuple2MatrixEntryFlatMapFunction implements Function<Tuple2<Vector, Long>, Tuple2<Object, DenseVector<Object>>> {
         private Broadcast<HashMap<String,String>> tweetIDMapBroadCast;
         private Broadcast<HashMap<String,String>> tweetWordMapBroadCast;
 
@@ -273,41 +280,77 @@ public class TFIDF implements Serializable{
             tweetWordMapBroadCast = paraTweetWordMap;
         }
 
+        //denseVecMatrix
         @Override
-		public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Vector,Long> vectorLongTuple2)throws Exception {
-			TreeMap<Long, Double> wordMap = new TreeMap<>();
+		public Tuple2<Object, DenseVector<Object>> call(Tuple2<Vector,Long> vectorLongTuple2)throws Exception {
 			long matrixIdx = 0;
-			ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
-			Tuple2<Object,Object> locTuple;
+			ArrayList<Object> tuple2s = new ArrayList<Object>();
+			double[] doubles = new double[tweetWordMapBroadCast.value().size()];
 			for (int i : vectorLongTuple2._1().toSparse().indices()) {
-				//logger.info("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
-				//logger.info("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
-				//logger.info("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
-
-				//System.out.println("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
-				//System.out.println("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
-				//System.out.println("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
 				if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {
 					System.out.println("tweetWordMapBroadCast contains no value error!");
 					logger.info("tweetWordMapBroadCast contains no value error!");
-					//matrixIdx = Long.valueOf(tweetWordMapBroadCast.getValue().size()+1);
-					//tweetWordMapBroadCast.getValue().put(String.valueOf(matrixIdx) , tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
 				} else {
 					Iterator<Map.Entry<String, String>> iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
 					while (iter.hasNext()) {
 						Map.Entry<String, String> entry = iter.next();
 						if (entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))) {
 							matrixIdx = Long.valueOf(entry.getKey());
-							locTuple = new Tuple2<Object, Object>(vectorLongTuple2._2().longValue(),matrixIdx);
-							tuple2s.add(new Tuple2<Tuple2<Object, Object>,Object>(locTuple, Double.valueOf(vectorLongTuple2._1().toArray()[i]).floatValue()));
+							//format matrixIdx+ ";" + doubleValue
+							tuple2s.add(matrixIdx+ TopicConstant.SEMICOLON_DELIMITER+Double.valueOf(vectorLongTuple2._1().toArray()[i]).doubleValue());
 							break;
 						}
 					}
 				}
 			}
-
-			return tuple2s.iterator();
+			String[] splitStr;
+			for(Object object:tuple2s.toArray()){
+				splitStr = ((String) object).split(TopicConstant.SEMICOLON_DELIMITER);
+				doubles[Integer.parseInt(splitStr[0])] = Double.valueOf(splitStr[1]).doubleValue();
+			}
+			List<double[]> list = Arrays.asList(doubles);
+			DenseVector<Object> denseVector = new DenseVector<Object>(list.toArray()[0]);
+			return new Tuple2<Object, DenseVector<Object>>(vectorLongTuple2._2().longValue(),denseVector);
 		}
+
+
+//coordinateMatrix version
+//        @Override
+//		public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Vector,Long> vectorLongTuple2)throws Exception {
+//			TreeMap<Long, Double> wordMap = new TreeMap<>();
+//			long matrixIdx = 0;
+//			ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
+//			Tuple2<Object,Object> locTuple;
+//			for (int i : vectorLongTuple2._1().toSparse().indices()) {
+//				//logger.info("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+//				//logger.info("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+//				//logger.info("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+//
+//				//System.out.println("tweetIDMapBroadCast.getValue().entrySet().size():" + tweetIDMapBroadCast.getValue().entrySet().size());
+//				//System.out.println("tweetWordMapBroadCast.getValue().entrySet().size():" + tweetWordMapBroadCast.getValue().entrySet().size());
+//				//System.out.println("tweetIDMapBroadCast.getValue().get(String.valueOf(i)):" + tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+//				if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {
+//					System.out.println("tweetWordMapBroadCast contains no value error!");
+//					logger.info("tweetWordMapBroadCast contains no value error!");
+//					//matrixIdx = Long.valueOf(tweetWordMapBroadCast.getValue().size()+1);
+//					//tweetWordMapBroadCast.getValue().put(String.valueOf(matrixIdx) , tweetIDMapBroadCast.getValue().get(String.valueOf(i)));
+//				} else {
+//					Iterator<Map.Entry<String, String>> iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
+//					while (iter.hasNext()) {
+//						Map.Entry<String, String> entry = iter.next();
+//						if (entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))) {
+//							matrixIdx = Long.valueOf(entry.getKey());
+//							locTuple = new Tuple2<Object, Object>(vectorLongTuple2._2().longValue(),matrixIdx);
+//							tuple2s.add(new Tuple2<Tuple2<Object, Object>,Object>(locTuple, Double.valueOf(vectorLongTuple2._1().toArray()[i]).floatValue()));
+//							break;
+//						}
+//					}
+//				}
+//			}
+//			return tuple2s.iterator();
+//		}
+
+
 //        @Override
 //        public Iterator<MatrixEntry> call(Tuple2<Vector, Long> vectorLongTuple2) throws Exception {
 //            List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();

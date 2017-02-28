@@ -6,15 +6,14 @@ import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaDoubleRDD;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.function.DoubleFlatMapFunction;
-import org.apache.spark.api.java.function.FlatMapFunction;
-import org.apache.spark.api.java.function.Function2;
-import org.apache.spark.api.java.function.VoidFunction;
+import org.apache.spark.api.java.function.*;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.storage.StorageLevel;
+import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
+import vo.TweetInfo;
 
 import java.util.*;
 
@@ -25,10 +24,11 @@ public class MeasureUtil {
     //public static HashMap<String,Integer> wordCntMap=new HashMap<String,Integer>();
 
     static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(MeasureUtil.class.getName());
-    public static double getKLDivergence(DenseVecMatrix vDVM, DenseVecMatrix wDVM, DenseVecMatrix hDVM){
+    public static double getKLDivergence(DenseVecMatrix vDVM, DenseVecMatrix wDVM, DenseVecMatrix hDVM , DoubleAccumulator KLDSumAccumulator){
 //        final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
         double dbResult;
-        DenseVecMatrix whDVM = wDVM.toBlockMatrix(1,1).multiply(hDVM.toBlockMatrix(1,1)).toDenseVecMatrix();
+        DenseVecMatrix whDVM = (DenseVecMatrix) wDVM.multiply(hDVM,TopicConstant.cores);
+        whDVM.rows().persist(StorageLevel.MEMORY_ONLY());
         DenseVecMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,vDVM,whDVM);
         loginSide.rows().persist(StorageLevel.MEMORY_ONLY());
         DenseVecMatrix logResult = getMatrixLogValue(loginSide);
@@ -37,45 +37,49 @@ public class MeasureUtil {
         diffPara.rows().persist(StorageLevel.MEMORY_ONLY());
         DenseVecMatrix result = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply,vDVM,logResult).add(diffPara);
         result.rows().persist(StorageLevel.MEMORY_ONLY());
-//        result.toRowMatrix().rows().toJavaRDD().foreach(new VoidFunction<Vector>() {
+
+        //doubleRDD version
+//        JavaDoubleRDD javaDoubleRDD = result.rows().toJavaRDD().flatMapToDouble(new DoubleFlatMapFunction<Tuple2<Object, DenseVector<Object>>>() {
 //            @Override
-//            public void call(Vector vector) throws Exception {
-//                System.out.println(vector);
+//            public Iterator<Double> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+//                ArrayList<Double> doubles = new ArrayList<Double>();
+//                ArrayList<Object> objects = new ArrayList<Object>();
+//                Collections.addAll(objects,objectDenseVectorTuple2._2().data());
+//                double dbValue;
+//                for (Object obj:(double[])objects.toArray()[0]){
+//                    dbValue = (double)obj;
+//                    if(!Double.isNaN(dbValue) && !Double.isInfinite(dbValue) && Double.isFinite(dbValue)){
+//                        doubles.add(dbValue);
+//                    }
+//                }
+//                return doubles.iterator();
+//            }
+//        });
+//
+//        dbResult = javaDoubleRDD.reduce(new Function2<Double, Double, Double>() {
+//            @Override
+//            public Double call(Double v1, Double v2) throws Exception {
+//                return v1+v2;
 //            }
 //        });
 
-//        result.entries().toJavaRDD().foreach(new VoidFunction<MatrixEntry>() {
-//            @Override
-//            public void call(MatrixEntry t) throws Exception{
-//                System.out.println(t.value());
-//                dbAccumulator.add(t.value());
-//            }
-//        });
-
-        JavaDoubleRDD javaDoubleRDD = result.rows().toJavaRDD().flatMapToDouble(new DoubleFlatMapFunction<Tuple2<Object, DenseVector<Object>>>() {
+        //accumulator version
+        result.rows().toJavaRDD().foreach(new VoidFunction<Tuple2<Object, DenseVector<Object>>>() {
             @Override
-            public Iterator<Double> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
-                ArrayList<Double> doubles = new ArrayList<Double>();
+            public void call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
                 ArrayList<Object> objects = new ArrayList<Object>();
                 Collections.addAll(objects,objectDenseVectorTuple2._2().data());
                 double dbValue;
                 for (Object obj:(double[])objects.toArray()[0]){
                     dbValue = (double)obj;
                     if(!Double.isNaN(dbValue) && !Double.isInfinite(dbValue) && Double.isFinite(dbValue)){
-                        doubles.add(dbValue);
+                        KLDSumAccumulator.add(dbValue);
                     }
                 }
-                return doubles.iterator();
             }
         });
 
-        dbResult = javaDoubleRDD.reduce(new Function2<Double, Double, Double>() {
-            @Override
-            public Double call(Double v1, Double v2) throws Exception {
-                return v1+v2;
-            }
-        });
-        //System.out.println("rows:"+result.numRows()+",cols:"+result.numCols());
+        dbResult = KLDSumAccumulator.sum();
         return dbResult;
     }
 
@@ -100,26 +104,50 @@ public class MeasureUtil {
 //            }
 //        });
 
-        JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> targetRDD2 = srcMat.rows().toJavaRDD().flatMap(new FlatMapFunction<Tuple2<Object, DenseVector<Object>>, Tuple2<Tuple2<Object, Object>, Object>>() {
+        //coordinateMatrix version
+//        JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> targetRDD2 = srcMat.rows().toJavaRDD().flatMap(new FlatMapFunction<Tuple2<Object, DenseVector<Object>>, Tuple2<Tuple2<Object, Object>, Object>>() {
+//            @Override
+//            public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+//                ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
+//                Tuple2<Object,Object> locTuple;
+//                for (int i=0;i<objectDenseVectorTuple2._2().size();i++){
+//                    ArrayList<Object> objects = new ArrayList<Object>();
+//                    Collections.addAll(objects,objectDenseVectorTuple2._2().data());
+//                    locTuple = new Tuple2<Object, Object>(objectDenseVectorTuple2._1(),Integer.valueOf(i).longValue());
+//                    tuple2s.add(new Tuple2<Tuple2<Object, Object>,Object>(locTuple,Double.valueOf(Math.log(((double[])objects.get(0))[i])).floatValue()));
+//                }
+//                return tuple2s.iterator();
+//            }
+//        });
+
+        //denseVecMatrix
+        JavaRDD<Tuple2<Object,DenseVector<Object>>> targetRDD2 = srcMat.rows().toJavaRDD().map(new Function<Tuple2<Object,DenseVector<Object>>, Tuple2<Object,DenseVector<Object>>>() {
             @Override
-            public Iterator<Tuple2<Tuple2<Object, Object>, Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
-                ArrayList<Tuple2<Tuple2<Object,Object>,Object>> tuple2s = new ArrayList<Tuple2<Tuple2<Object, Object>, Object>>();
-                Tuple2<Object,Object> locTuple;
+            public Tuple2<Object,DenseVector<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+                double [] doubles = new double[objectDenseVectorTuple2._2().size()];
+                ArrayList<Double> arrayList = new ArrayList<Double>();
+
                 for (int i=0;i<objectDenseVectorTuple2._2().size();i++){
                     ArrayList<Object> objects = new ArrayList<Object>();
                     Collections.addAll(objects,objectDenseVectorTuple2._2().data());
-                    locTuple = new Tuple2<Object, Object>(objectDenseVectorTuple2._1(),Integer.valueOf(i).longValue());
-                    tuple2s.add(new Tuple2<Tuple2<Object, Object>,Object>(locTuple,Double.valueOf(Math.log(((double[])objects.get(0))[i])).floatValue()));
+                    arrayList.add(Double.valueOf(Math.log(((double[])objects.get(0))[i])).doubleValue());
                 }
-                return tuple2s.iterator();
+                for(int i=0;i<doubles.length;i++){
+                    doubles[i] = Double.valueOf((Double) arrayList.toArray()[i]).doubleValue();
+                }
+                List<double[]> list = Arrays.asList(doubles);
+                DenseVector<Object> denseVector = new DenseVector<Object>(list.toArray()[0]);
+                return new Tuple2<Object, DenseVector<Object>>(objectDenseVectorTuple2._1(),denseVector);
             }
         });
 
-        CoordinateMatrix coordinateMatrix = new CoordinateMatrix(targetRDD2.rdd());
-        return coordinateMatrix.toDenseVecMatrix();
+        //coordinateMatrix version
+        //CoordinateMatrix coordinateMatrix = new CoordinateMatrix(targetRDD2.rdd());
+        DenseVecMatrix denseVecMatrix = new DenseVecMatrix(targetRDD2.rdd());
+        return denseVecMatrix;
     }
 
-    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD , Broadcast<HashMap<String,Integer>> brWordCntMap , SparkSession sparkSession){
+    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD , Broadcast<HashMap<String,Integer>> brWordCntMap , SparkSession sparkSession, List<TweetInfo> tweetInfoList){
         //parameter : topic word array, RDD tweet
         //return  : dbSum
 
@@ -169,8 +197,18 @@ public class MeasureUtil {
                         hashKeyAccumulator.add(wordCntMap2.get(hashKey));
                     }
 
-                    //test
-                    tweetRDD.foreach(new tweetRDD_ForeachFunc2(topicWordArray[i],topicWordArray[j],wjAccumulator,hashKeyAccumulator,isWjCounted,isWiWjCounted));
+                    //tweetRDD foreach version
+//                    tweetRDD.foreach(new tweetRDD_ForeachFunc2(topicWordArray[i],topicWordArray[j],wjAccumulator,hashKeyAccumulator,isWjCounted,isWiWjCounted));
+//                    if(wjAccumulator.value() > 0) {
+//                        wordCntMap2.put(topicWordArray[j], wjAccumulator.value().intValue());
+//                    }
+
+                    //tweetInfo list version
+                    Iterator<TweetInfo> tweetInfoIterator = tweetInfoList.iterator();
+                    while (tweetInfoIterator.hasNext()){
+                        TweetInfo tmpTweetInfo = tweetInfoIterator.next();
+                        foundSameWordFunc(tmpTweetInfo.getTweet(),topicWordArray[i],topicWordArray[j],wjAccumulator,hashKeyAccumulator,isWjCounted,isWiWjCounted);
+                    }
                     if(wjAccumulator.value() > 0) {
                         wordCntMap2.put(topicWordArray[j], wjAccumulator.value().intValue());
                     }
@@ -191,6 +229,30 @@ public class MeasureUtil {
             }
         }
         return dbSum;
+    }
+
+    public static void foundSameWordFunc(String tweet, String wordI , String wordJ , LongAccumulator wjAccumulator , LongAccumulator hashKeyAccumulator , boolean isWjCounted , boolean isWiWjCounted){
+        int WjCount,WiWjCount;
+        boolean wjFounded = false;
+        if (!isWjCounted || !isWiWjCounted) {
+            //wjFounded = Arrays.asList(tweet.split(" ")).stream().map(key -> key.toLowerCase()).collect(Collectors.toList()).contains(topicWordArray[idx_j]);
+            wjFounded = Arrays.asList(tweet.split(" ")).stream().anyMatch(key -> key.toLowerCase().indexOf(wordJ.toLowerCase())!=-1);
+        }
+
+        //count Wj
+        if (!isWjCounted && wjFounded) {
+            wjAccumulator.add(1);
+        }
+
+        //count Wi,Wj
+        if (!isWiWjCounted) {
+            Boolean wiFounded = Arrays.asList(tweet.split(" ")).stream().anyMatch(key -> key.toLowerCase().indexOf(wordI.toLowerCase())!=-1);
+            if (wiFounded && wjFounded) {
+                hashKeyAccumulator.add(1);
+            }
+        }
+        logger.info("wjFound:"+wjFounded);
+        System.out.println("wjFound:"+wjFounded);
     }
 }
 
