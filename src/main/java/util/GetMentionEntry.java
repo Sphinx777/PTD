@@ -1,16 +1,15 @@
 package util;
 
+import org.apache.parquet.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
 public class GetMentionEntry implements FlatMapFunction<String,MatrixEntry>{
 	public Iterator<MatrixEntry> call(String paraStr){
 		String[] splitStrings = paraStr.split(TopicConstant.SEMICOLON_DELIMITER);
-		List<MatrixEntry> arrayList = new ArrayList<MatrixEntry>();
+		ObjectArrayList<MatrixEntry> arrayList = new ObjectArrayList<MatrixEntry>();
 		for(String str:splitStrings){
 			if(str.indexOf(TopicConstant.COMMA_DELIMITER)==-1){
 				continue;

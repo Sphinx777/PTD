@@ -3,6 +3,9 @@ package util.tfidf;
 import breeze.linalg.DenseVector;
 import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -18,6 +21,8 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.util.CollectionAccumulator;
 import scala.Tuple2;
+import scala.collection.mutable.Seq;
+import scala.collection.mutable.WrappedArray;
 import util.TopicConstant;
 
 import java.io.Serializable;
@@ -29,14 +34,14 @@ public class TFIDF implements Serializable{
 	private Dataset<Row> tweetDataset;
 	private Dataset<Row> tfidfDataSet;
 	private DenseVecMatrix tfidfDVM;
-	private HashMap<String,String> tweetIDMap = new HashMap<String,String>();
+	private Object2ObjectOpenHashMap<String,String> tweetIDMap = new Object2ObjectOpenHashMap<String,String>();
 	public Dataset<Row> getTfidfDataSet() {
 		return tfidfDataSet;
 	}
 
-	private static Broadcast<HashMap<String,String>> brTweetIDMap;
+	private static Broadcast<Object2ObjectOpenHashMap<String,String>> brTweetIDMap;
 
-	private static Broadcast<HashMap<String,String>> brTweetWordMap;
+	private static Broadcast<Object2ObjectOpenHashMap<String,String>> brTweetWordMap;
 
 	private static JavaSparkContext sparkContext;
 
@@ -66,7 +71,7 @@ public class TFIDF implements Serializable{
 		Dataset<Row> filterData = remover.transform(wordsData);
 
 		//get wordAccumulator
-		filterData.select("words").toJavaRDD().foreach(new filterRowFunction(tweetAccumulator));
+		filterData.toJavaRDD().foreach(new filterRowFunction(tweetAccumulator));
 
 		org.apache.spark.mllib.feature.HashingTF tf = new org.apache.spark.mllib.feature.HashingTF();
 		//tfidf for ml start
@@ -79,13 +84,13 @@ public class TFIDF implements Serializable{
 			}
 		});
 
-		HashSet<String> tweetHashSet = new HashSet<String>(tweetAccumulator.value());
+		ObjectOpenHashSet<String> tweetHashSet = new ObjectOpenHashSet<String>(tweetAccumulator.value());
 
 		JavaRDD<org.apache.spark.mllib.linalg.Vector> termFreqs = tf.transform(listJavaRDD);
 		long idxCnt = 0;
 		logger.info("tweetHashSet.count:"+tweetHashSet.size());
-        HashMap<String,String> tmpTweetIDMap = new HashMap<>();
-        HashMap<String,String> tweetWordMap = new HashMap<>();
+        Object2ObjectOpenHashMap<String,String> tmpTweetIDMap = new Object2ObjectOpenHashMap<>();
+		Object2ObjectOpenHashMap<String,String> tweetWordMap = new Object2ObjectOpenHashMap<>();
 		for(Object obj:tweetHashSet.toArray()){
 			System.out.println("index:"+tf.indexOf(obj.toString())+",word:"+obj.toString());
 			logger.info("index:"+tf.indexOf(obj.toString())+",word:"+obj.toString());
@@ -229,7 +234,7 @@ public class TFIDF implements Serializable{
 	public DenseVecMatrix getTfidfDVM(){
 		return tfidfDVM;
 	}
-	public HashMap<String, String> getTweetIDMap() {
+	public Object2ObjectOpenHashMap<String, String> getTweetIDMap() {
 		return tweetIDMap;
 	}
 
@@ -262,8 +267,10 @@ public class TFIDF implements Serializable{
 
 		@Override
         public void call(Row row) throws Exception {
-			List<Object> rowList = row.getList(0);
-			for(Object obj:rowList){
+			//List<Object> rowList = row.getList(0);
+            List<Object> rowList = row.getList(3);
+
+            for(Object obj:rowList){
 				String wrd = obj.toString();
 				wordAccumulator.add(wrd);
 			}
@@ -272,10 +279,10 @@ public class TFIDF implements Serializable{
 
 	//coordinateMatrix version
     private class Tuple2MatrixEntryFlatMapFunction implements Function<Tuple2<Vector, Long>, Tuple2<Object, DenseVector<Object>>> {
-        private Broadcast<HashMap<String,String>> tweetIDMapBroadCast;
-        private Broadcast<HashMap<String,String>> tweetWordMapBroadCast;
+        private Broadcast<Object2ObjectOpenHashMap<String,String>> tweetIDMapBroadCast;
+        private Broadcast<Object2ObjectOpenHashMap<String,String>> tweetWordMapBroadCast;
 
-        public Tuple2MatrixEntryFlatMapFunction(Broadcast<HashMap<String,String>> paraTweetIDMap , Broadcast<HashMap<String,String>> paraTweetWordMap){
+        public Tuple2MatrixEntryFlatMapFunction(Broadcast<Object2ObjectOpenHashMap<String,String>> paraTweetIDMap , Broadcast<Object2ObjectOpenHashMap<String,String>> paraTweetWordMap){
             tweetIDMapBroadCast = paraTweetIDMap;
             tweetWordMapBroadCast = paraTweetWordMap;
         }
@@ -284,7 +291,7 @@ public class TFIDF implements Serializable{
         @Override
 		public Tuple2<Object, DenseVector<Object>> call(Tuple2<Vector,Long> vectorLongTuple2)throws Exception {
 			long matrixIdx = 0;
-			ArrayList<Object> tuple2s = new ArrayList<Object>();
+			ObjectArrayList<Object> tuple2s = new ObjectArrayList<Object>();
 			double[] doubles = new double[tweetWordMapBroadCast.value().size()];
 			for (int i : vectorLongTuple2._1().toSparse().indices()) {
 				if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {

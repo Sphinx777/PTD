@@ -3,23 +3,28 @@ package util;
 import breeze.linalg.DenseVector;
 import info.debatty.java.stringsimilarity.KShingling;
 import info.debatty.java.stringsimilarity.StringProfile;
+import it.unimi.dsi.fastutil.doubles.Double2DoubleArrayMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.log4j.Logger;
+
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.util.CollectionAccumulator;
 import scala.Tuple2;
 import vo.TweetInfo;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
 
 public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, DenseVector<Object>>> {
 	//List<Row> tmpMentionList;
-    List<TweetInfo> tweetInfos = new ArrayList<TweetInfo>();
+    ObjectArrayList<TweetInfo> tweetInfos = new ObjectArrayList<TweetInfo>();
 	Date currDate;
 	private String model;
     static Logger logger = Logger.getLogger(JoinMentionString.class.getName());
 	CollectionAccumulator<TweetInfo> collectionAccumulator;
 
-	public JoinMentionString(List<TweetInfo> oriTweetAccumulator, Date paraCurrDate , String paraModel){
+	public JoinMentionString(ObjectArrayList<TweetInfo> oriTweetAccumulator, Date paraCurrDate , String paraModel){
 		//tmpMentionList = strings;
 		tweetInfos = oriTweetAccumulator;
 		currDate = paraCurrDate;
@@ -28,9 +33,9 @@ public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, Dens
 
 	public Tuple2<Object, DenseVector<Object>> call(TweetInfo tweetData) throws Exception{
 		final String splitStrings=tweetData.getUserName();
-		final List<String> arr = new ArrayList<String>();
+		final ObjectArrayList<String> arr = new ObjectArrayList<String>();
 		String tmpString;
-		TreeMap<Double, Double> treeMap = new TreeMap<>();
+		Double2DoubleArrayMap treeMap = new Double2DoubleArrayMap();
 
 		//compute mention people
         //old
@@ -84,15 +89,14 @@ public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, Dens
 		        //passing the sigmoid
 
 		        dbValue = TopicUtil.calculateSigmoid(dbValue);
-                treeMap.put(Double.valueOf(tweetInfo.getTweetId()), Double.valueOf(dbValue).doubleValue());
+                treeMap.put(Double.valueOf(tweetInfo.getTweetId()).doubleValue(), Double.valueOf(dbValue).doubleValue());
                 logger.info("tweet id:"+ Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
                 System.out.println("tweet id:"+Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
             }else{
-				treeMap.put(Double.valueOf(tweetInfo.getTweetId()),0.0);
+				treeMap.put(Double.valueOf(tweetInfo.getTweetId()).doubleValue(),0.0);
 			}
 		}
 
-		ArrayList<Double> doubles = new ArrayList<>();
 		double [] doublesArray = new double[treeMap.values().toArray().length];
 		for(int i=0;i<treeMap.values().toArray().length;i++){
 			doublesArray[i] = ((Double) treeMap.values().toArray()[i]);

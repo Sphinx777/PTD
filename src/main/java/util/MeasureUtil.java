@@ -1,12 +1,13 @@
 package util;
 
 import breeze.linalg.DenseVector;
-import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.log4j.Logger;
-import org.apache.spark.api.java.JavaDoubleRDD;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.function.*;
+import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.storage.StorageLevel;
@@ -67,7 +68,7 @@ public class MeasureUtil {
         result.rows().toJavaRDD().foreach(new VoidFunction<Tuple2<Object, DenseVector<Object>>>() {
             @Override
             public void call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
-                ArrayList<Object> objects = new ArrayList<Object>();
+                ObjectArrayList<Object> objects = new ObjectArrayList<Object>();
                 Collections.addAll(objects,objectDenseVectorTuple2._2().data());
                 double dbValue;
                 for (Object obj:(double[])objects.toArray()[0]){
@@ -125,10 +126,10 @@ public class MeasureUtil {
             @Override
             public Tuple2<Object,DenseVector<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
                 double [] doubles = new double[objectDenseVectorTuple2._2().size()];
-                ArrayList<Double> arrayList = new ArrayList<Double>();
+                ObjectArrayList<Double> arrayList = new ObjectArrayList<Double>();
 
                 for (int i=0;i<objectDenseVectorTuple2._2().size();i++){
-                    ArrayList<Object> objects = new ArrayList<Object>();
+                    ObjectArrayList<Object> objects = new ObjectArrayList<Object>();
                     Collections.addAll(objects,objectDenseVectorTuple2._2().data());
                     arrayList.add(Double.valueOf(Math.log(((double[])objects.get(0))[i])).doubleValue());
                 }
@@ -147,7 +148,7 @@ public class MeasureUtil {
         return denseVecMatrix;
     }
 
-    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD , Broadcast<HashMap<String,Integer>> brWordCntMap , SparkSession sparkSession, List<TweetInfo> tweetInfoList){
+    public static double getTopicCoherenceValue(String[] topicWordArray , JavaRDD<String> tweetRDD , Broadcast<Object2IntOpenHashMap<String>> brWordCntMap , SparkSession sparkSession, ObjectArrayList<TweetInfo> tweetInfoList){
         //parameter : topic word array, RDD tweet
         //return  : dbSum
 
@@ -155,7 +156,7 @@ public class MeasureUtil {
         boolean isWjCounted, isWiWjCounted;
         //HashMap<String,Integer> wordCntMap=brWordCntMap.getValue();
         //test
-        HashMap<String,Integer> wordCntMap2= new HashMap<String,Integer>();
+        Object2IntOpenHashMap<String> wordCntMap2= new Object2IntOpenHashMap<String>();
         LongAccumulator wjAccumulator = sparkSession.sparkContext().longAccumulator();
         LongAccumulator hashKeyAccumulator = sparkSession.sparkContext().longAccumulator();
 
@@ -260,10 +261,10 @@ class tweetRDD_ForeachFunc implements VoidFunction<String>{
     private int idx_i , idx_j;
     private boolean isWjCounted , isWiWjCounted;
     private String[] topicWordArray;
-    private Broadcast<HashMap<String,Integer>> wrdCntMap;
+    private Broadcast<Object2IntOpenHashMap<String>> wrdCntMap;
     private String hashKey;
 
-    public tweetRDD_ForeachFunc(String[] input_topicWordArray , Broadcast<HashMap<String,Integer>> input_Map , String input_hashKey , int inputIdx_i , int inputIdx_j , boolean input_isWjCounted , boolean input_isWiWjCounted){
+    public tweetRDD_ForeachFunc(String[] input_topicWordArray , Broadcast<Object2IntOpenHashMap<String>> input_Map , String input_hashKey , int inputIdx_i , int inputIdx_j , boolean input_isWjCounted , boolean input_isWiWjCounted){
         idx_i = inputIdx_i;
         idx_j = inputIdx_j;
         isWjCounted = input_isWjCounted;

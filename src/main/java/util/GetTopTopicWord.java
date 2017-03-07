@@ -1,29 +1,32 @@
 package util;
 
+import it.unimi.dsi.fastutil.ints.Int2DoubleArrayMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.log4j.Logger;
-import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.util.CollectionAccumulator;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
 
 /**
  * Created by user on 2016/11/12.
  */
-public class GetTopTopicWord implements VoidFunction<LinkedHashMap<Integer,Double>> {
+public class GetTopTopicWord implements VoidFunction<Int2DoubleArrayMap> {
     //private final int intTopWordCnt = 10;
-    private HashMap<String,String> tweetIDMap = new HashMap<String,String>();
+    private Object2ObjectOpenHashMap<String,String> tweetIDMap = new Object2ObjectOpenHashMap<String,String>();
     private int numTopWords;
     private CollectionAccumulator<String[]> tweetWordAccumulator;
     static Logger logger = Logger.getLogger(GetTopTopicWord.class.getName());
-    public  GetTopTopicWord(HashMap<String,String> srcMap , int paraNumTopWords , CollectionAccumulator<String[]> paraAccumulator){
+    public  GetTopTopicWord(Object2ObjectOpenHashMap<String,String> srcMap , int paraNumTopWords , CollectionAccumulator<String[]> paraAccumulator){
         tweetIDMap = srcMap;
         numTopWords = paraNumTopWords;
         tweetWordAccumulator = paraAccumulator;
     }
 
-    public void call(LinkedHashMap<Integer,Double> map) throws Exception {
-        ArrayList<String> stringArrayList = new ArrayList<String>();
+    public void call(Int2DoubleArrayMap map) throws Exception {
+        ObjectArrayList<String> stringArrayList = new ObjectArrayList<String>();
         //logger.info("content entry length:"+map.entrySet().size());
         //System.out.println("content entry length:"+map.entrySet().size());
         logger.info("Get topic word call function!");

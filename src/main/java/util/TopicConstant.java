@@ -6,6 +6,7 @@ public class TopicConstant {
 	public static final String COMMA_DELIMITER=",";
 	public static final String SEMICOLON_DELIMITER=";";
 	public static final String SPACE_DELIMITER=" ";
+	public static final String DOUBLE_QUOTE_DELIMITER="\"";
 	public enum MatrixOperation {
 		Mutiply,
 		Divide

@@ -1,13 +1,14 @@
 package util;
 
 import breeze.linalg.DenseVector;
-import edu.nju.pasalab.marlin.matrix.CoordinateMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.Optional;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.ml.feature.*;
@@ -28,9 +29,9 @@ public class TopicUtil {
     static Logger logger = Logger.getLogger(TopicUtil.class.getName());
 
     public static int computeArrayIntersection(String[] arr1, String[] arr2) {
-        Set<String> aList = new LinkedHashSet<String>(Arrays.asList(arr1));
-        Set<String> bList = new LinkedHashSet<String>(Arrays.asList(arr2));
-        ArrayList<String> list = new ArrayList<String>();
+        ObjectLinkedOpenHashSet<String> aList = new ObjectLinkedOpenHashSet<String>(Arrays.asList(arr1));
+        ObjectLinkedOpenHashSet<String> bList = new ObjectLinkedOpenHashSet<String>(Arrays.asList(arr2));
+        ObjectArrayList<String> list = new ObjectArrayList<String>();
 
         for (String str : bList) {
             if (!aList.add(str)) {
@@ -45,7 +46,7 @@ public class TopicUtil {
     }
 
     public static int computeArrayUnion(String[] arr1, String[] arr2) {
-        HashSet<String> tmpSet = new HashSet<String>();
+        ObjectOpenHashSet<String> tmpSet = new ObjectOpenHashSet<String>();
         tmpSet.addAll(Arrays.asList(arr1));
         tmpSet.addAll(Arrays.asList(arr2));
 
@@ -156,15 +157,15 @@ public class TopicUtil {
 //                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
 //            }
 //        });
-     JavaPairRDD<Object,ArrayList<Object>> tmpDividendRDD = matDividend.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ArrayList<Object>>() {
+     JavaPairRDD<Object,ObjectArrayList<Object>> tmpDividendRDD = matDividend.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ObjectArrayList<Object>>() {
          @Override
-         public Tuple2<Object, ArrayList<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+         public Tuple2<Object, ObjectArrayList<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
              logger.info("matDividend map to pair");
              System.out.println("matDividend map to pair");
 
-             ArrayList<Object> arrayList = new ArrayList<>();
+             ObjectArrayList<Object> arrayList = new ObjectArrayList<>();
              Collections.addAll(arrayList, objectDenseVectorTuple2._2().data());
-             return new Tuple2<Object, ArrayList<Object>>((Object) objectDenseVectorTuple2._1(),arrayList);
+             return new Tuple2<Object, ObjectArrayList<Object>>((Object) objectDenseVectorTuple2._1(),arrayList);
          }
      });
 
@@ -175,21 +176,21 @@ public class TopicUtil {
 //        });
 tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
 
-    JavaPairRDD<Object,ArrayList<Object>> tmpDivisorRDD = matDivisor.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ArrayList<Object>>() {
+    JavaPairRDD<Object,ObjectArrayList<Object>> tmpDivisorRDD = matDivisor.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ObjectArrayList<Object>>() {
         @Override
-        public Tuple2<Object, ArrayList<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
+        public Tuple2<Object, ObjectArrayList<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
             logger.info("matDivisor map to pair");
             System.out.println("matDivisor map to pair");
-            ArrayList<Object> arrayList = new ArrayList<>();
+            ObjectArrayList<Object> arrayList = new ObjectArrayList<>();
             Collections.addAll(arrayList, objectDenseVectorTuple2._2().data());
-            return new Tuple2<Object, ArrayList<Object>>((Object) objectDenseVectorTuple2._1(),arrayList);
+            return new Tuple2<Object, ObjectArrayList<Object>>((Object) objectDenseVectorTuple2._1(),arrayList);
         }
     });
 
         tmpDivisorRDD.persist(StorageLevel.MEMORY_ONLY());
 //        JavaPairRDD<String, Tuple2<Double, Optional<Double>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
 
-     JavaPairRDD<Object,Tuple2<ArrayList<Object>, Optional<ArrayList<Object>>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
+     JavaPairRDD<Object,Tuple2<ObjectArrayList<Object>, Optional<ObjectArrayList<Object>>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
         tmpRDD.persist(StorageLevel.MEMORY_ONLY());
 //        class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<String, Tuple2<Double, Optional<Double>>>, MatrixEntry> {
 //            private final TopicConstant.MatrixOperation operation;
@@ -226,11 +227,11 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
         //coordinate matrix version
         //JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> resultRDD = tmpRDD.flatMap(new Tuple2DenseVectorPairFunction(operation));
         //denseVecMatrix
-        JavaPairRDD<Object,ArrayList<Object>> resultRDD = tmpRDD.mapToPair(new Tuple2DenseVectorPairFunction(operation));
+        JavaPairRDD<Object,ObjectArrayList<Object>> resultRDD = tmpRDD.mapToPair(new Tuple2DenseVectorPairFunction(operation));
 
-        JavaRDD<Tuple2<Object,DenseVector<Object>>> resultRDD2 = resultRDD.map(new Function<Tuple2<Object, ArrayList<Object>>, Tuple2<Object, DenseVector<Object>>>() {
+        JavaRDD<Tuple2<Object,DenseVector<Object>>> resultRDD2 = resultRDD.map(new Function<Tuple2<Object, ObjectArrayList<Object>>, Tuple2<Object, DenseVector<Object>>>() {
             @Override
-            public Tuple2<Object, DenseVector<Object>> call(Tuple2<Object, ArrayList<Object>> v1) throws Exception {
+            public Tuple2<Object, DenseVector<Object>> call(Tuple2<Object, ObjectArrayList<Object>> v1) throws Exception {
                 double [] doubles = new double[v1._2().size()];
                 for(int i=0;i<doubles.length;i++){
                     doubles[i] = Double.valueOf((Double) v1._2().toArray()[i]).doubleValue();
@@ -292,7 +293,7 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
                 return String.join(TopicConstant.SPACE_DELIMITER,Arrays.copyOf(rowList.toArray(),rowList.size(),String[].class));
             }
         });
-        //outputCorpusStringRDD.collect();
+        outputCorpusStringRDD.collect();
         outputCorpusStringRDD.coalesce(1,true).saveAsTextFile(corpusFilePath);
 
         //create word vector
@@ -303,12 +304,12 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
 
         Word2VecModel model = word2Vec.fit(filterData);
         Dataset<Row> vectorDS = model.transform(filterData);
-        //model.getVectors().toJavaRDD().collect();
-        model.getVectors().toJavaRDD().coalesce(1,true).saveAsTextFile(wordVectorFilePath);
+        filterData.unpersist();
+        model.getVectors().toJavaRDD().saveAsTextFile(wordVectorFilePath);
     }
 
-    public static List<String[]> readTopicWordList(String inputTopicWordPath){
-        List<String[]> topicWordList = new ArrayList<String[]>();
+    public static ObjectArrayList<String[]> readTopicWordList(String inputTopicWordPath){
+        ObjectArrayList<String[]> topicWordList = new ObjectArrayList<String[]>();
         BufferedReader br = null;
         try {
             br = new BufferedReader(new FileReader(inputTopicWordPath));
@@ -329,7 +330,7 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
     //coordinate matrix version
 //    private static class Tuple2DenseVectorPairFunction implements FlatMapFunction<Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>>,Tuple2<Tuple2<Object, Object>, Object>> {
 //denseVecMatrix
-    private static class Tuple2DenseVectorPairFunction implements PairFunction<Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>>,Object, ArrayList<Object>> {
+    private static class Tuple2DenseVectorPairFunction implements PairFunction<Tuple2<Object,Tuple2<ObjectArrayList<Object>,Optional<ObjectArrayList<Object>>>>,Object, ObjectArrayList<Object>> {
         private final TopicConstant.MatrixOperation operation;
         public Tuple2DenseVectorPairFunction(TopicConstant.MatrixOperation operation) {
             this.operation = operation;
@@ -383,13 +384,13 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
 //        }
 
         //denseVecMatrix
-        public Tuple2<Object,ArrayList<Object>> call(Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>> tuple2){
+        public Tuple2<Object,ObjectArrayList<Object>> call(Tuple2<Object,Tuple2<ObjectArrayList<Object>,Optional<ObjectArrayList<Object>>>> tuple2){
             Long rowNo = (Long) tuple2._1();
-            ArrayList<Object> tuple2s = new ArrayList<Object>();
+            ObjectArrayList<Object> tuple2s = new ObjectArrayList<Object>();
             double flt;
             if(tuple2._2()._2().isPresent()){
-                double[] dividendArray =  (double[]) ((ArrayList<Object>)tuple2._2()._1()).get(0);
-                double[] divisorArray = (double[]) (((ArrayList<Object>)tuple2._2()._2().get()).get(0));
+                double[] dividendArray =  (double[]) ((ObjectArrayList<Object>)tuple2._2()._1()).get(0);
+                double[] divisorArray = (double[]) (((ObjectArrayList<Object>)tuple2._2()._2().get()).get(0));
                 logger.info("dividend array length:"+dividendArray.length);
                 logger.info("divisor array length:"+divisorArray.length);
                 for (int idx=0;idx<dividendArray.length;idx++){
@@ -404,7 +405,7 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
                     }
                 }
             }
-            return new Tuple2<Object, ArrayList<Object>>(rowNo,tuple2s);
+            return new Tuple2<Object, ObjectArrayList<Object>>(rowNo,tuple2s);
         }
     }
 }

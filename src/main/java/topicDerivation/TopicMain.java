@@ -4,9 +4,14 @@ import breeze.linalg.DenseVector;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
+import it.unimi.dsi.fastutil.ints.Int2DoubleLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.ForeachFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
@@ -58,15 +63,16 @@ public class TopicMain {
                 });
 
                 //for local build
-//                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 
                 sparkSession = SparkSession.builder()
                         //for local build
-//                        .master("local")
+                        .master("local")
                         .appName("TopicDerivation")
                         .config("spark.sql.warehouse.dir", "file:///")
                         .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
                         .config("spark.kryo.registrator",TweetInfoKryoRegister.class.getName())
+                        //.config("spark.kryoserializer.buffer.max","2000m")
                         .getOrCreate();
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
@@ -83,17 +89,19 @@ public class TopicMain {
 
                 final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
 
-                StructType schema = new StructType().add("polarity", "string").add("oldTweetId", "int").add("date", "string")
+                StructType schema = new StructType().add("polarity", "string").add("oldTweetId", "double").add("date", "string")
                         .add("noUse", "string").add("userName", "string").add("tweet", "string")
                         .add("mentionMen", "string").add("userInteraction", "string");
 
                 //read csv file to dataSet
                 Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(cmdArgs.inputFilePath);
 
+                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath);
+
                 SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
                 String outFilePath = cmdArgs.outputFilePath + "_" + sdf.format((Date) broadcastCurrDate.getValue());
                 double maxCoherenceValue = -Double.MAX_VALUE;
-                List<String[]> topicWordList = new ArrayList<String[]>();
+                ObjectArrayList<String[]> topicWordList = new ObjectArrayList<>();
 
                 //drop the no use column
                 Dataset<Row> currDataset = csvDataset.drop("polarity", "noUse");
@@ -108,16 +116,17 @@ public class TopicMain {
                 CollectionAccumulator<TweetInfo> tweetInfoAccumulator = sc.sc().collectionAccumulator();
 
                 //set custom javaRDD and compute the mentionMen
-                JavaRDD<TweetInfo> tweetJavaRDD = currDataset.javaRDD().map(new Function<Row, TweetInfo>() {
-                    public TweetInfo call(Row row) throws Exception {
+                JavaRDD<TweetInfo> tweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
+                    @Override
+                    public TweetInfo call(String v1) throws Exception {
+                        String[] splitStrings = v1.replace(TopicConstant.DOUBLE_QUOTE_DELIMITER,"").split(TopicConstant.COMMA_DELIMITER);
                         TweetInfo tweet = new TweetInfo();
                         tweet.setTweetId(tweetIDAccumulator.value().toString());
+                        System.out.println("tweet id:"+tweetIDAccumulator.value());
                         tweetIDAccumulator.add(1);
-                        logger.info("TweetId:"+tweet.getTweetId());
-                        System.out.println("TweetId:"+tweet.getTweetId());
-                        tweet.setDateString(row.getAs("date").toString());
-                        tweet.setUserName(row.getAs("userName").toString());
-                        tweet.setTweet(row.getAs("tweet").toString());
+                        tweet.setDateString(splitStrings[2]);
+                        tweet.setUserName(splitStrings[4]);
+                        tweet.setTweet(splitStrings[5]);
                         tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
                         tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
                         return tweet;
@@ -150,11 +159,11 @@ public class TopicMain {
                                 returnStr += TopicConstant.COMMA_DELIMITER + strings[1].replace(":", "").replace("@", "");
                             }
                         }
-
                         return returnStr;
                     }
                 });
 
+                logger.info("tweetJavaRDD compute finish!");
                 tweetJavaRDD.persist(StorageLevel.MEMORY_ONLY());
 
                 tweetJavaRDD.foreach(new VoidFunction<TweetInfo>() {
@@ -163,7 +172,7 @@ public class TopicMain {
                         tweetInfoAccumulator.add(tweetInfo);
                     }
                 });
-                //logger.info("tweetJavaRDD first id:"+tweetJavaRDD.first().getTweetId());
+                logger.info("tweetInfoAccumulator size:"+tweetInfoAccumulator.value().size());
 
                 Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
                 Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
@@ -177,6 +186,7 @@ public class TopicMain {
                     String wordVectorFilePath = cmdArgs.outputFilePath + "_wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
                     Dataset<Row> tweetDS = ds.select("tweetId", "tweet");
                     Dataset<Row> filterDS = sparkSession.createDataFrame(tweetDS.toJavaRDD(), schemaTFIDF);
+                    tweetJavaRDD.unpersist();
                     TopicUtil.transformToVector(filterDS, corpusFilePath, wordVectorFilePath);
                     return;
                 }
@@ -204,8 +214,7 @@ public class TopicMain {
 
                     //new
                     //JavaPairRDD<Object,ArrayList<Double>> computePORDD = tweetJavaRDD.mapToPair(new JoinMentionString(tweetInfoAccumulator.value(),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
-
-                    JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = tweetJavaRDD.map(new JoinMentionString(tweetInfoAccumulator.value(),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
+                    JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = tweetJavaRDD.map(new JoinMentionString(new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
 
                     //coordinate matrix version
 //                    JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> tweetTuple2RDD = computePORDD.flatMap(new FlatMapFunction<Tuple2<Object, ArrayList<Object>>, Tuple2<Tuple2<Object, Object>, Object>>() {
@@ -298,9 +307,9 @@ public class TopicMain {
 
                     logger.info("order NMF score!");
                     System.out.println("order NMF score!");
-                    JavaRDD<LinkedHashMap<Integer, Double>> cmpRDD = H1.rows().toJavaRDD().map(new Function<Tuple2<Object, DenseVector<Object>>, LinkedHashMap<Integer, Double>>() {
+                    JavaRDD<Int2DoubleLinkedOpenHashMap> cmpRDD = H1.rows().toJavaRDD().map(new Function<Tuple2<Object, DenseVector<Object>>, Int2DoubleLinkedOpenHashMap>() {
                         @Override
-                        public LinkedHashMap<Integer, Double> call(Tuple2<Object, DenseVector<Object>> srcTuple) throws Exception {
+                        public Int2DoubleLinkedOpenHashMap call(Tuple2<Object, DenseVector<Object>> srcTuple) throws Exception {
                             ArrayList<Object> tmpList = new ArrayList<Object>();
                             Collections.addAll(tmpList,srcTuple._2().data());
                             double[] tmpDBArray = (double[])tmpList.get(0);
@@ -319,7 +328,7 @@ public class TopicMain {
                                 }
                             });
 
-                            LinkedHashMap<Integer,Double> result = new LinkedHashMap<Integer, Double>();
+                            Int2DoubleLinkedOpenHashMap result = new Int2DoubleLinkedOpenHashMap();
                             for(Map.Entry<Integer,Double> entry:list){
                                 //System.out.println("order NMF:"+entry.getKey()+"--"+entry.getValue());
                                 //logger.info("order NMF:"+entry.getKey()+"--"+entry.getValue());
@@ -371,7 +380,7 @@ public class TopicMain {
                     logger.info("transform to JSON!");
                     System.out.println("transform to JSON!");
                     CollectionAccumulator<String[]> topicWordAccumulator = sc.sc().collectionAccumulator();
-                    JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(tfidf.getTweetIDMap(),cmdArgs.numTopWords,topicWordAccumulator));
+                    JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(new Object2ObjectOpenHashMap(tfidf.getTweetIDMap()),cmdArgs.numTopWords,topicWordAccumulator));
 
                     System.out.println("outFilePath:"+outFilePath);
                     logger.info("outFilePath:"+outFilePath);
@@ -386,12 +395,12 @@ public class TopicMain {
                     //foreach version
                     //cmpRDD.foreach(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords,topicWordAccumulator));
 
-                    topicWordList = topicWordAccumulator.value();
+                    topicWordList = new ObjectArrayList<String[]>(topicWordAccumulator.value());
                 } else {
                     //model = "coherence"
                     logger.info("read topic word list!");
                     System.out.println("read topic word list!");
-                    topicWordList = TopicUtil.readTopicWordList(cmdArgs.coherenceFilePath);
+                    topicWordList = new ObjectArrayList<String[]>(TopicUtil.readTopicWordList(cmdArgs.coherenceFilePath));
                 }
 
                 //get the topic coherence value
@@ -405,7 +414,7 @@ public class TopicMain {
                 DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
 
                 double tmpCoherenceValue;
-                Broadcast<HashMap<String, Integer>> brWordCntMap = sc.broadcast(new HashMap<String, Integer>());
+                Broadcast<Object2IntOpenHashMap<String>> brWordCntMap = sc.broadcast(new Object2IntOpenHashMap<String>());
 
                 logger.info("compute the topic coherence value!");
                 System.out.println("compute the topic coherence value!");
@@ -417,7 +426,7 @@ public class TopicMain {
                     logger.info("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
                     System.out.println("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
 
-                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession ,tweetInfoAccumulator.value());
+                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession , new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()));
                     if (Double.compare(tmpCoherenceValue, maxCoherenceValue) > 0) {
                         maxCoherenceValue = tmpCoherenceValue;
                     }
