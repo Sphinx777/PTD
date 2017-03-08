@@ -8,6 +8,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.DoubleAccumulator;
+import util.CmdArgs;
 import util.MeasureUtil;
 import util.TopicConstant;
 import util.TopicUtil;
@@ -140,7 +141,7 @@ public class NMF implements Serializable {
 
             //logger.info("start to compute H--W:"+originalW.numRows()+","+originalW.numCols()+";H:"+originalH.numRows()+","+originalH.numCols());
             System.out.println("start to compute H");
-            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wTranMatrix.multiply(V,TopicConstant.cores),(DenseVecMatrix) ((DenseVecMatrix) wTranMatrix.multiply(originalW,TopicConstant.cores)).multiply(originalH,TopicConstant.cores));
+            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wTranMatrix.multiply(V, CmdArgs.cores),(DenseVecMatrix) ((DenseVecMatrix) wTranMatrix.multiply(originalW,CmdArgs.cores)).multiply(originalH,CmdArgs.cores));
 		    HUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
             newH = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalH, HUpdateMatrix);
             newH.rows().persist(StorageLevel.MEMORY_ONLY());
@@ -204,7 +205,7 @@ public class NMF implements Serializable {
 //				});
 //				tmpWUpdate2.rows().toJavaRDD().collect();
 
-                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, V.toBlockMatrix(1,1).multiply(hTranMatrix.toBlockMatrix(1,1)).toDenseVecMatrix(),(DenseVecMatrix) ((DenseVecMatrix) originalW.multiply(originalH,TopicConstant.cores)).multiply(hTranMatrix,TopicConstant.cores));
+                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, V.toBlockMatrix(1,1).multiply(hTranMatrix.toBlockMatrix(1,1)).toDenseVecMatrix(),(DenseVecMatrix) ((DenseVecMatrix) originalW.multiply(originalH,CmdArgs.cores)).multiply(hTranMatrix,CmdArgs.cores));
                 WUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
                 newW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalW,WUpdateMatrix);
                 newW.rows().persist(StorageLevel.MEMORY_ONLY());

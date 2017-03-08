@@ -46,7 +46,7 @@ public class TopicMain {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 		//parse the arguments
-		TopicConstant cmdArgs = new TopicConstant();
+		CmdArgs cmdArgs = new CmdArgs();
 		CmdLineParser parser = new CmdLineParser(cmdArgs);
 		try {
 			parser.parseArgument(args);

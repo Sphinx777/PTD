@@ -28,7 +28,7 @@ public class MeasureUtil {
     public static double getKLDivergence(DenseVecMatrix vDVM, DenseVecMatrix wDVM, DenseVecMatrix hDVM , DoubleAccumulator KLDSumAccumulator){
 //        final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
         double dbResult;
-        DenseVecMatrix whDVM = (DenseVecMatrix) wDVM.multiply(hDVM,TopicConstant.cores);
+        DenseVecMatrix whDVM = (DenseVecMatrix) wDVM.multiply(hDVM,CmdArgs.cores);
         whDVM.rows().persist(StorageLevel.MEMORY_ONLY());
         DenseVecMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,vDVM,whDVM);
         loginSide.rows().persist(StorageLevel.MEMORY_ONLY());
