@@ -1,13 +1,17 @@
 package util.nmf;
 
+import breeze.linalg.DenseVector;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import edu.nju.pasalab.marlin.utils.MTUtils;
 import edu.nju.pasalab.marlin.utils.UniformGenerator;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.DoubleAccumulator;
+import org.apache.spark.util.SizeEstimator;
+import scala.Tuple2;
 import util.CmdArgs;
 import util.MeasureUtil;
 import util.TopicConstant;
@@ -15,6 +19,7 @@ import util.TopicUtil;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 
 public class NMF implements Serializable {
 	private double initialNum = 0.01;
@@ -29,7 +34,7 @@ public class NMF implements Serializable {
 
 	public NMF(DenseVecMatrix matV, boolean isUpdateW, JavaSparkContext paraSparkContext , int paraNumFactors , int paraNumIters , long numRows , long numCols) {
 		V = matV;
-        V.rows().persist(StorageLevel.MEMORY_ONLY());
+        V.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 		boolUpdateW = isUpdateW;
 		minKLDivergence = java.lang.Double.MAX_VALUE;
 		//initialize to zero or other method
@@ -77,12 +82,13 @@ public class NMF implements Serializable {
             logger.info("update The originalW!");
             System.out.println("update The originalW!");
             //old
-			//tmpWEntryRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+			//tmpWEntryRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 			//originalW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
 			//minW = new CoordinateMatrix(tmpWEntryRDD.rdd(), numRows, numFactors);
 
 			//new
 			originalW = MTUtils.randomDenVecMatrix(javaSparkContext.sc(),numRows,numFactors,0,new UniformGenerator(0.0, 1.0));
+			System.out.println("originalW mem size:"+SizeEstimator.estimate(originalW));
 			minW = originalW;
 		}
 
@@ -109,12 +115,13 @@ public class NMF implements Serializable {
 //			}
 //		});
 //
-//		tmpHEntryRDD.persist(StorageLevel.MEMORY_ONLY_SER());
+//		tmpHEntryRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 //		originalH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
 //		minH = new CoordinateMatrix(tmpHEntryRDD.rdd(), numFactors,numCols);
 
 		//new
 		originalH = MTUtils.randomDenVecMatrix(javaSparkContext.sc(),numFactors,Long.valueOf(numCols).intValue(),0,new UniformGenerator(0.0, 1.0));
+		System.out.println("originalH mem size:"+SizeEstimator.estimate(originalH));
 		minH = originalH;
 
         logger.info("NMF initial function finish");
@@ -125,26 +132,19 @@ public class NMF implements Serializable {
 	public void buildNMFModel(){
 		final ArrayList<Double> tmpKLDivergenceList = new ArrayList<Double>();
 		for(int iter=0;iter< numIters;iter++) {
-//
-//			BlockMatrix wBkMat = originalW.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-//			BlockMatrix wTransBkMat = originalW.transpose().toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-//			BlockMatrix vBkMat = V.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-//			BlockMatrix hBkMat = originalH.toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-//			BlockMatrix hTranBkMat = originalH.transpose().toBlockMatrix().persist(StorageLevel.MEMORY_ONLY_SER());
-//
-//            CoordinateMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, wTransBkMat.multiply(vBkMat), wTransBkMat.multiply(wBkMat).multiply(hBkMat));
 
 			DenseVecMatrix wTranMatrix = originalW.transpose().toDenseVecMatrix();
-			wTranMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+			wTranMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 			DenseVecMatrix hTranMatrix = originalH.transpose().toDenseVecMatrix();
-			hTranMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+			hTranMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 
             //logger.info("start to compute H--W:"+originalW.numRows()+","+originalW.numCols()+";H:"+originalH.numRows()+","+originalH.numCols());
-            System.out.println("start to compute H");
+            //System.out.println("start to compute H");
+
             DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wTranMatrix.multiply(V, CmdArgs.cores),(DenseVecMatrix) ((DenseVecMatrix) wTranMatrix.multiply(originalW,CmdArgs.cores)).multiply(originalH,CmdArgs.cores));
-		    HUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+		    HUpdateMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
             newH = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalH, HUpdateMatrix);
-            newH.rows().persist(StorageLevel.MEMORY_ONLY());
+            newH.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
             logger.info("compute H finish");
             System.out.println("compute H finish");
 
@@ -206,9 +206,9 @@ public class NMF implements Serializable {
 //				tmpWUpdate2.rows().toJavaRDD().collect();
 
                 DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, V.toBlockMatrix(1,1).multiply(hTranMatrix.toBlockMatrix(1,1)).toDenseVecMatrix(),(DenseVecMatrix) ((DenseVecMatrix) originalW.multiply(originalH,CmdArgs.cores)).multiply(hTranMatrix,CmdArgs.cores));
-                WUpdateMatrix.rows().persist(StorageLevel.MEMORY_ONLY());
+                WUpdateMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
                 newW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalW,WUpdateMatrix);
-                newW.rows().persist(StorageLevel.MEMORY_ONLY());
+                newW.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
                 logger.info("compute W finish");
                 System.out.println("compute W finish");
             }else{

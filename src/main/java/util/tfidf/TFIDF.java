@@ -20,6 +20,7 @@ import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.util.CollectionAccumulator;
+import org.apache.spark.util.SizeEstimator;
 import scala.Tuple2;
 import scala.collection.mutable.Seq;
 import scala.collection.mutable.WrappedArray;
@@ -67,8 +68,12 @@ public class TFIDF implements Serializable{
 
 		Dataset<Row> wordsData = regexTokenizer.transform(tweetDataset);
 
+		System.out.println("wordsData mem size:"+ SizeEstimator.estimate(wordsData));
+
 		StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
 		Dataset<Row> filterData = remover.transform(wordsData);
+
+		System.out.println("filterData mem size:"+SizeEstimator.estimate(filterData));
 
 		//get wordAccumulator
 		filterData.toJavaRDD().foreach(new filterRowFunction(tweetAccumulator));
@@ -85,6 +90,8 @@ public class TFIDF implements Serializable{
 		});
 
 		ObjectOpenHashSet<String> tweetHashSet = new ObjectOpenHashSet<String>(tweetAccumulator.value());
+		System.out.println("tweetHashSet mem size:"+SizeEstimator.estimate(tweetHashSet));
+
 
 		JavaRDD<org.apache.spark.mllib.linalg.Vector> termFreqs = tf.transform(listJavaRDD);
 		long idxCnt = 0;
@@ -106,8 +113,10 @@ public class TFIDF implements Serializable{
 
 		org.apache.spark.mllib.feature.IDF idfMllib = new org.apache.spark.mllib.feature.IDF();
 		JavaRDD<org.apache.spark.mllib.linalg.Vector> tfIdfs = idfMllib.fit(termFreqs).transform(termFreqs);
+		System.out.println("tfIdfs mem size:"+SizeEstimator.estimate(tfIdfs));
 
 		JavaPairRDD<org.apache.spark.mllib.linalg.Vector,Long> tfidfPairRDD = tfIdfs.zipWithIndex();
+		System.out.println("tfidfPairRDD mem size:"+SizeEstimator.estimate(tfidfPairRDD));
 		/*tfidfPairRDD.foreach(new VoidFunction<Tuple2<org.apache.spark.mllib.linalg.Vector, Long>>() {
 			@Override
 			public void call(Tuple2<Vector, Long> vectorLongTuple2) throws Exception {
@@ -121,7 +130,7 @@ public class TFIDF implements Serializable{
 		//JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> entryJavaRDD = tfidfPairRDD.flatMap(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
         //denseVecMatrix version
         JavaRDD<Tuple2<Object,DenseVector<Object>>> entryJavaRDD = tfidfPairRDD.map(new Tuple2MatrixEntryFlatMapFunction(brTweetIDMap,brTweetWordMap));
-
+		System.out.println("entryJavaRDD mem size:"+SizeEstimator.estimate(entryJavaRDD));
 //		JavaRDD<MatrixEntry> entryJavaRDD = tfIdfs.flatMap(new FlatMapFunction<org.apache.spark.mllib.linalg.Vector, MatrixEntry>() {
 //															   @Override
 //															   public Iterator<MatrixEntry> call(org.apache.spark.mllib.linalg.Vector vector) throws Exception {
@@ -229,6 +238,7 @@ public class TFIDF implements Serializable{
         //CoordinateMatrix coordinateMatrix = new CoordinateMatrix(entryJavaRDD.rdd());
 		//tfidfDVM = coordinateMatrix.toDenseVecMatrix();
 		tfidfDVM = new DenseVecMatrix(entryJavaRDD.rdd());
+		System.out.println("tfidfDVM mem size:"+SizeEstimator.estimate(tfidfDVM));
 	}
 	//x:tweet Id , y:term id(features--vector) , value:tfidf(features--vector)
 	public DenseVecMatrix getTfidfDVM(){

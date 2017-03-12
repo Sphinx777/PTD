@@ -9,9 +9,10 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.log4j.Logger;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.ForeachFunction;
+import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
@@ -25,6 +26,7 @@ import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.CollectionAccumulator;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
+import org.apache.spark.util.SizeEstimator;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import scala.Tuple2;
@@ -58,16 +60,16 @@ public class TopicMain {
                 logger.info("start");
 
                 StructType schemaTFIDF = new StructType(new StructField[]{
-                        new StructField("tweetId", DataTypes.StringType, false, Metadata.empty()),
+                        new StructField("tweetId", DataTypes.LongType, false, Metadata.empty()),
                         new StructField("tweet", DataTypes.StringType, false, Metadata.empty())
                 });
 
                 //for local build
-                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+//                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 
                 sparkSession = SparkSession.builder()
                         //for local build
-                        .master("local")
+//                        .master("local")
                         .appName("TopicDerivation")
                         .config("spark.sql.warehouse.dir", "file:///")
                         .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
@@ -94,9 +96,10 @@ public class TopicMain {
                         .add("mentionMen", "string").add("userInteraction", "string");
 
                 //read csv file to dataSet
-                Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(cmdArgs.inputFilePath);
+                //Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(cmdArgs.inputFilePath);
 
-                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath);
+                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,6);
+                //System.out.println("stringJavaRDD mem size:"+ SizeEstimator.estimate(stringJavaRDD));
 
                 SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
                 String outFilePath = cmdArgs.outputFilePath + "_" + sdf.format((Date) broadcastCurrDate.getValue());
@@ -104,7 +107,7 @@ public class TopicMain {
                 ObjectArrayList<String[]> topicWordList = new ObjectArrayList<>();
 
                 //drop the no use column
-                Dataset<Row> currDataset = csvDataset.drop("polarity", "noUse");
+               // Dataset<Row> currDataset = csvDataset.drop("polarity", "noUse");
 
                 //add accumulator
                 LongAccumulator tweetIDAccumulator = sc.sc().longAccumulator();
@@ -116,17 +119,19 @@ public class TopicMain {
                 CollectionAccumulator<TweetInfo> tweetInfoAccumulator = sc.sc().collectionAccumulator();
 
                 //set custom javaRDD and compute the mentionMen
-                JavaRDD<TweetInfo> tweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
+                JavaRDD<TweetInfo> oldTweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
                     @Override
                     public TweetInfo call(String v1) throws Exception {
-                        String[] splitStrings = v1.replace(TopicConstant.DOUBLE_QUOTE_DELIMITER,"").split(TopicConstant.COMMA_DELIMITER);
+                        String[] splitStrings = v1.replaceAll(TopicConstant.DOUBLE_QUOTE_DELIMITER,"").split(TopicConstant.COMMA_DELIMITER);
                         TweetInfo tweet = new TweetInfo();
-                        tweet.setTweetId(tweetIDAccumulator.value().toString());
-                        System.out.println("tweet id:"+tweetIDAccumulator.value());
+                        //tweet.setTweetId(tweetIDAccumulator.value());
+                        //logger.info("tweetIDAccumulator.value():"+tweetIDAccumulator.value());
+                        //System.out.println("tweet id:"+tweetIDAccumulator.value());
+
                         tweetIDAccumulator.add(1);
                         tweet.setDateString(splitStrings[2]);
                         tweet.setUserName(splitStrings[4]);
-                        tweet.setTweet(splitStrings[5]);
+                        tweet.setTweet(splitStrings[5].replaceAll("(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]",""));
                         tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
                         tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
                         return tweet;
@@ -163,8 +168,38 @@ public class TopicMain {
                     }
                 });
 
+                JavaPairRDD<TweetInfo,Long> tweetInfoZipPairRDD = oldTweetJavaRDD.zipWithIndex();
+
+                JavaRDD<TweetInfo> tweetJavaRDD = tweetInfoZipPairRDD.mapPartitions(new FlatMapFunction<Iterator<Tuple2<TweetInfo, Long>>, TweetInfo>() {
+                    @Override
+                    public Iterator<TweetInfo> call(Iterator<Tuple2<TweetInfo, Long>> tuple2Iterator) throws Exception {
+                        ArrayList<TweetInfo> tweetInfoArrayList = new ArrayList<TweetInfo>();
+                        while(tuple2Iterator.hasNext()){
+                            Tuple2<TweetInfo,Long> tuple2 = tuple2Iterator.next();
+                            TweetInfo tweetInfo = tuple2._1();
+                            tweetInfo.setTweetId(tuple2._2().longValue());
+                            tweetInfoArrayList.add(tweetInfo);
+                        }
+
+                        return tweetInfoArrayList.iterator();
+                    }
+                });
+
                 logger.info("tweetJavaRDD compute finish!");
-                tweetJavaRDD.persist(StorageLevel.MEMORY_ONLY());
+
+                System.out.println("tweetJavaRDD mem size:"+SizeEstimator.estimate(tweetJavaRDD));
+
+                tweetJavaRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+
+                logger.info("tweetInfoAccumulator size:"+tweetInfoAccumulator.value().size());
+                System.out.println("tweetInfoAccumulator mem size:"+SizeEstimator.estimate(tweetInfoAccumulator));
+
+                Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
+                Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
+
+                tweetJavaRDD = TopicUtil.preProcessTweetRDD(ds);
+
+                tweetJavaRDD.first();
 
                 tweetJavaRDD.foreach(new VoidFunction<TweetInfo>() {
                     @Override
@@ -172,11 +207,9 @@ public class TopicMain {
                         tweetInfoAccumulator.add(tweetInfo);
                     }
                 });
-                logger.info("tweetInfoAccumulator size:"+tweetInfoAccumulator.value().size());
 
-                Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
-                Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
-                ds.persist(StorageLevel.MEMORY_ONLY());
+                System.out.println("ds mem size:"+SizeEstimator.estimate(ds));
+                ds.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
                 //transform to word vector
                 if (cmdArgs.model.equals("vector")) {
@@ -186,7 +219,6 @@ public class TopicMain {
                     String wordVectorFilePath = cmdArgs.outputFilePath + "_wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
                     Dataset<Row> tweetDS = ds.select("tweetId", "tweet");
                     Dataset<Row> filterDS = sparkSession.createDataFrame(tweetDS.toJavaRDD(), schemaTFIDF);
-                    tweetJavaRDD.unpersist();
                     TopicUtil.transformToVector(filterDS, corpusFilePath, wordVectorFilePath);
                     return;
                 }
@@ -214,7 +246,10 @@ public class TopicMain {
 
                     //new
                     //JavaPairRDD<Object,ArrayList<Double>> computePORDD = tweetJavaRDD.mapToPair(new JoinMentionString(tweetInfoAccumulator.value(),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
-                    JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = tweetJavaRDD.map(new JoinMentionString(new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
+
+                    //JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = tweetJavaRDD.map(new JoinMentionString(new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
+
+                    JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = tweetJavaRDD.mapPartitions(new JoinMentionStringForPartition(new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
 
                     //coordinate matrix version
 //                    JavaRDD<Tuple2<Tuple2<Object,Object>,Object>> tweetTuple2RDD = computePORDD.flatMap(new FlatMapFunction<Tuple2<Object, ArrayList<Object>>, Tuple2<Tuple2<Object, Object>, Object>>() {
@@ -250,7 +285,10 @@ public class TopicMain {
 //                        }
 //                    });
 
+                    System.out.println("tuple2JavaRDD mem size:"+SizeEstimator.estimate(tuple2JavaRDD));
                     DenseVecMatrix tweetDVM = new DenseVecMatrix(tuple2JavaRDD.rdd());
+
+                    System.out.println("tweetDVM mem size:"+SizeEstimator.estimate(tweetDVM));
 
                     logger.info("set mention entry!");
                     System.out.println("set mention entry!");
@@ -273,7 +311,10 @@ public class TopicMain {
                     //poRDD.unpersist();
 
                     Dataset<Row> tfidfDataset = ds.select("tweetId", "tweet");
+                    System.out.println("tfidfDataset mem size:"+SizeEstimator.estimate(tfidfDataset));
+
                     Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(), schemaTFIDF);
+                    System.out.println("sentenceData mem size:"+SizeEstimator.estimate(sentenceData));
 
                     //tfidf
                     //Broadcast<HashMap<String, String>> brTweetIDMap = sc.broadcast(new HashMap<String, String>());
@@ -283,7 +324,7 @@ public class TopicMain {
 
                     //tweetIDAccumulator.reset();
 
-                    sentenceData.persist(StorageLevel.MEMORY_ONLY());
+                    sentenceData.persist(StorageLevel.MEMORY_AND_DISK_SER());
                     TFIDF tfidf = new TFIDF(sentenceData,sc, stringAccumulator);
 
                     logger.info("build tfidf model!");
@@ -366,8 +407,8 @@ public class TopicMain {
 //                            return result;
 //                    }
 //                    });
-
-                    cmpRDD.persist(StorageLevel.MEMORY_ONLY());
+                    System.out.println("cmpRDD mem size:"+SizeEstimator.estimate(cmpRDD));
+                    cmpRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
                     //System.out.println("cmpRdd count:"+cmpRDD.count());
                     //logger.info("cmpRdd count:"+cmpRDD.count());
@@ -384,6 +425,7 @@ public class TopicMain {
 
                     System.out.println("outFilePath:"+outFilePath);
                     logger.info("outFilePath:"+outFilePath);
+                    System.out.println("jsonRDD mem size:"+SizeEstimator.estimate(jsonRDD));
                     jsonRDD.coalesce(1,true).saveAsTextFile(outFilePath);
 
                     logger.info("get top topic word list!");
@@ -410,11 +452,12 @@ public class TopicMain {
                         return v1.getTweet();
                     }
                 });
-                tweetStrRDD.persist(StorageLevel.MEMORY_ONLY());
+                tweetStrRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
                 DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
 
                 double tmpCoherenceValue;
                 Broadcast<Object2IntOpenHashMap<String>> brWordCntMap = sc.broadcast(new Object2IntOpenHashMap<String>());
+                System.out.println("brWordCntMap mem size:"+SizeEstimator.estimate(brWordCntMap));
 
                 logger.info("compute the topic coherence value!");
                 System.out.println("compute the topic coherence value!");

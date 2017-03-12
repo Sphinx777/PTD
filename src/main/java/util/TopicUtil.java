@@ -15,7 +15,9 @@ import org.apache.spark.ml.feature.*;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.storage.StorageLevel;
+import org.apache.spark.util.SizeEstimator;
 import scala.Tuple2;
+import vo.TweetInfo;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -174,7 +176,7 @@ public class TopicUtil {
 //                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
 //            }
 //        });
-tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
+tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
     JavaPairRDD<Object,ObjectArrayList<Object>> tmpDivisorRDD = matDivisor.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ObjectArrayList<Object>>() {
         @Override
@@ -187,11 +189,12 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
         }
     });
 
-        tmpDivisorRDD.persist(StorageLevel.MEMORY_ONLY());
+        tmpDivisorRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 //        JavaPairRDD<String, Tuple2<Double, Optional<Double>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
 
      JavaPairRDD<Object,Tuple2<ObjectArrayList<Object>, Optional<ObjectArrayList<Object>>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
-        tmpRDD.persist(StorageLevel.MEMORY_ONLY());
+        System.out.println("tmpRDD mem size:"+ SizeEstimator.estimate(tmpRDD));
+        tmpRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 //        class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<String, Tuple2<Double, Optional<Double>>>, MatrixEntry> {
 //            private final TopicConstant.MatrixOperation operation;
 
@@ -229,6 +232,8 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
         //denseVecMatrix
         JavaPairRDD<Object,ObjectArrayList<Object>> resultRDD = tmpRDD.mapToPair(new Tuple2DenseVectorPairFunction(operation));
 
+        System.out.println("resultRDD mem size:"+SizeEstimator.estimate(resultRDD));
+
         JavaRDD<Tuple2<Object,DenseVector<Object>>> resultRDD2 = resultRDD.map(new Function<Tuple2<Object, ObjectArrayList<Object>>, Tuple2<Object, DenseVector<Object>>>() {
             @Override
             public Tuple2<Object, DenseVector<Object>> call(Tuple2<Object, ObjectArrayList<Object>> v1) throws Exception {
@@ -242,9 +247,12 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
             }
         });
 
+        System.out.println("resultRDD2 mem size"+SizeEstimator.estimate(resultRDD2));
         //CoordinateMatrix coordinateMatrix = new CoordinateMatrix(resultRDD.rdd());
         //DenseVecMatrix denseVecMatrix = coordinateMatrix.toDenseVecMatrix();
         DenseVecMatrix denseVecMatrix = new DenseVecMatrix(resultRDD2.rdd());
+
+        System.out.println("denseVecMatrix mem size:"+SizeEstimator.estimate(denseVecMatrix));
         logger.info("getCoorMatOption finish");
         System.out.println("getCoorMatOption finish");
         return denseVecMatrix;
@@ -276,14 +284,41 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_ONLY());
         return dbWeighted;
     }
 
+    public static JavaRDD<TweetInfo> preProcessTweetRDD(Dataset<TweetInfo> tweetInfoDataset){
+        RegexTokenizer regexTokenizer = new RegexTokenizer().setInputCol("tweet").setOutputCol("token").setPattern("\\W").setMinTokenLength(3);
+        Dataset<Row> wordsData = regexTokenizer.transform(tweetInfoDataset);
+
+        StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
+        Dataset<Row> filterData = remover.transform(wordsData);
+        filterData.persist(StorageLevel.MEMORY_AND_DISK_SER());
+
+        //create corpus
+        JavaRDD<TweetInfo> outputCorpusStringRDD = filterData.toJavaRDD().map(new Function<Row, TweetInfo>() {
+            @Override
+            public TweetInfo call(Row v1) throws Exception {
+                TweetInfo tweetInfo = new TweetInfo();
+                tweetInfo.setUserName(v1.getAs("userName"));
+                List<Object> rowList = v1.getList(v1.size()-1);
+                tweetInfo.setTweet(String.join(TopicConstant.SPACE_DELIMITER,Arrays.copyOf(rowList.toArray(),rowList.size(),String[].class)));
+                tweetInfo.setDateString(v1.getAs("dateString"));
+                tweetInfo.setMentionMen(v1.getAs("mentionMen"));
+                tweetInfo.setTweetId(v1.getAs("tweetId"));
+                tweetInfo.setUserInteraction(v1.getAs("userInteraction"));
+                return tweetInfo;
+            }
+        });
+
+        //outputCorpusStringRDD.collect();
+        return outputCorpusStringRDD;
+    }
+
     public static void transformToVector(Dataset<Row> tweetInfoJavaRDD,String corpusFilePath,String wordVectorFilePath){
-        Tokenizer tokenizer = new Tokenizer().setInputCol("tweet").setOutputCol("token");
         RegexTokenizer regexTokenizer = new RegexTokenizer().setInputCol("tweet").setOutputCol("token").setPattern("\\W").setMinTokenLength(3);
         Dataset<Row> wordsData = regexTokenizer.transform(tweetInfoJavaRDD);
 
         StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
         Dataset<Row> filterData = remover.transform(wordsData);
-        filterData.persist(StorageLevel.MEMORY_ONLY_SER());
+        filterData.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
         //create corpus
         JavaRDD<String> outputCorpusStringRDD = filterData.select("words").toJavaRDD().map(new Function<Row, String>() {

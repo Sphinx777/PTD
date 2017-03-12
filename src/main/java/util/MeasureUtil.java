@@ -29,15 +29,15 @@ public class MeasureUtil {
 //        final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
         double dbResult;
         DenseVecMatrix whDVM = (DenseVecMatrix) wDVM.multiply(hDVM,CmdArgs.cores);
-        whDVM.rows().persist(StorageLevel.MEMORY_ONLY());
+        whDVM.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
         DenseVecMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,vDVM,whDVM);
-        loginSide.rows().persist(StorageLevel.MEMORY_ONLY());
+        loginSide.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
         DenseVecMatrix logResult = getMatrixLogValue(loginSide);
-        logResult.rows().persist(StorageLevel.MEMORY_ONLY());
+        logResult.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
         DenseVecMatrix diffPara = whDVM.subtract(vDVM);
-        diffPara.rows().persist(StorageLevel.MEMORY_ONLY());
+        diffPara.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
         DenseVecMatrix result = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply,vDVM,logResult).add(diffPara);
-        result.rows().persist(StorageLevel.MEMORY_ONLY());
+        result.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 
         //doubleRDD version
 //        JavaDoubleRDD javaDoubleRDD = result.rows().toJavaRDD().flatMapToDouble(new DoubleFlatMapFunction<Tuple2<Object, DenseVector<Object>>>() {

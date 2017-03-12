@@ -4,9 +4,9 @@ import breeze.linalg.DenseVector;
 import info.debatty.java.stringsimilarity.KShingling;
 import info.debatty.java.stringsimilarity.StringProfile;
 import it.unimi.dsi.fastutil.doubles.Double2DoubleArrayMap;
+import it.unimi.dsi.fastutil.longs.Long2DoubleArrayMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.log4j.Logger;
-
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.util.CollectionAccumulator;
 import scala.Tuple2;
@@ -33,15 +33,16 @@ public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, Dens
 
 	public Tuple2<Object, DenseVector<Object>> call(TweetInfo tweetData) throws Exception{
 		final String splitStrings=tweetData.getUserName();
-		final ObjectArrayList<String> arr = new ObjectArrayList<String>();
 		String tmpString;
-		Double2DoubleArrayMap treeMap = new Double2DoubleArrayMap();
+		Long2DoubleArrayMap treeMap = new Long2DoubleArrayMap();
 
 		//compute mention people
         //old
 		//for (Row row : tmpMentionList) {
 		//logger.info("collectAccumulator length:"+collectionAccumulator.value().size());
-        for(TweetInfo tweetInfo:tweetInfos){
+		for(int i = (int)tweetData.getTweetId()+1 ; i<tweetInfos.size(); i++){
+        	TweetInfo tweetInfo = tweetInfos.get(i);
+			//for(TweetInfo tweetInfo:tweetInfos){
 			//old
             //tmpString = row.getAs("userName").toString();
 			tmpString = tweetInfo.getUserName();
@@ -49,9 +50,11 @@ public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, Dens
 				//compute po
 				//old
                 //String[] arr1= row.getAs("mentionMen").toString().split(",");
+				//logger.info("compute mention men start");
 				String[] arr1 = tweetInfo.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
                 String[] arr2= tweetData.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
 				double dbValue = (double)TopicUtil.computeArrayIntersection(arr1, arr2) / TopicUtil.computeArrayUnion(arr1, arr2);
+				//logger.info("compute mention men finish");
 				//if(dbValue > 0){
 					//System.out.println();
 				//}
@@ -60,16 +63,19 @@ public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, Dens
 				//old
                 //String[] arr3= row.getAs("userInteraction").toString().split(",");
                 //new
-                String[] arr3= tweetInfo.getUserInteraction().split(",");
-				String[] arr4= tweetData.getUserInteraction().split(",");
+				//logger.info("compute user interaction start");
+                String[] arr3= tweetInfo.getUserInteraction().split(TopicConstant.COMMA_DELIMITER);
+				String[] arr4= tweetData.getUserInteraction().split(TopicConstant.COMMA_DELIMITER);
 				int intValue = TopicUtil.computeArrayIntersection(arr3, arr4);
 				if(intValue >0 ){
 					dbValue +=1;
 				}else {
 					dbValue +=0;
 				}
+				//logger.info("compute user interaction finish");
 
 				//compute cosine similarity min sentence size
+				//logger.info("compute cosine similarity start");
 				KShingling ks = new KShingling(2);
 				StringProfile pro1 = ks.getProfile(tweetData.getTweet());
 				//old
@@ -77,6 +83,7 @@ public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, Dens
                 StringProfile pro2 = ks.getProfile(tweetInfo.getTweet());
                 double dbCosValue = pro1.cosineSimilarity(pro2);
 		        dbValue += dbCosValue;
+				//logger.info("compute cosine similarity finish");
 
 				//weighted by time-factor
 				if(model.trim().toUpperCase().equals("DTTD")) {
@@ -88,22 +95,27 @@ public class JoinMentionString implements Function<TweetInfo,Tuple2<Object, Dens
 
 		        //passing the sigmoid
 
+				//logger.info("compute sigmoid start");
 		        dbValue = TopicUtil.calculateSigmoid(dbValue);
-                treeMap.put(Double.valueOf(tweetInfo.getTweetId()).doubleValue(), Double.valueOf(dbValue).doubleValue());
-                logger.info("tweet id:"+ Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
-                System.out.println("tweet id:"+Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
-            }else{
-				treeMap.put(Double.valueOf(tweetInfo.getTweetId()).doubleValue(),0.0);
+				//logger.info("compute sigmoid start");
+                treeMap.put(tweetInfo.getTweetId(), dbValue);
+
+                //logger.info("tweet id:"+ Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
+                //System.out.println("tweet id:"+Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
+			}else{
+				treeMap.put(tweetInfo.getTweetId(),0.0);
 			}
 		}
+		logger.info("current compute mention tweet id:"+tweetData.getTweetId());
+		System.out.println("current compute mention tweet id:"+tweetData.getTweetId());
 
-		double [] doublesArray = new double[treeMap.values().toArray().length];
-		for(int i=0;i<treeMap.values().toArray().length;i++){
-			doublesArray[i] = ((Double) treeMap.values().toArray()[i]);
-		}
+		double[] doubles = new double[tweetInfos.size()];
 
-		List<double[]> list = Arrays.asList(doublesArray);
-		DenseVector<Object> denseVector = new DenseVector<Object>(list.toArray()[0]);
+		//double[] doubles = Arrays.copyOf(treeMap.values().toDoubleArray(),tweetInfos.size());
+
+		System.arraycopy(treeMap.values().toDoubleArray(),0,doubles,(int)tweetData.getTweetId()+1,treeMap.size());
+
+		DenseVector<Object> denseVector = new DenseVector<Object>(doubles);
 
 		return new Tuple2<Object, DenseVector<Object>>(Long.valueOf(tweetData.getTweetId()),denseVector);
 	}

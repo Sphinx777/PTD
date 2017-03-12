@@ -3,11 +3,11 @@ package vo;
 import java.io.Serializable;
 
 public class TweetInfo implements Serializable{
-	private String tweetId;
-	public String getTweetId() {
+	private long tweetId;
+	public long getTweetId() {
 		return tweetId;
 	}
-	public void setTweetId(String tweetId) {
+	public void setTweetId(long tweetId) {
 		this.tweetId = tweetId;
 	}
 	public String getDateString() {
