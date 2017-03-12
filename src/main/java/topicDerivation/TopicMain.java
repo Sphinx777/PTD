@@ -65,11 +65,11 @@ public class TopicMain {
                 });
 
                 //for local build
-//                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
 
                 sparkSession = SparkSession.builder()
                         //for local build
-//                        .master("local")
+                        .master("local")
                         .appName("TopicDerivation")
                         .config("spark.sql.warehouse.dir", "file:///")
                         .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
@@ -128,7 +128,6 @@ public class TopicMain {
                         //logger.info("tweetIDAccumulator.value():"+tweetIDAccumulator.value());
                         //System.out.println("tweet id:"+tweetIDAccumulator.value());
 
-                        tweetIDAccumulator.add(1);
                         tweet.setDateString(splitStrings[2]);
                         tweet.setUserName(splitStrings[4]);
                         tweet.setTweet(splitStrings[5].replaceAll("(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]",""));
@@ -205,6 +204,7 @@ public class TopicMain {
                     @Override
                     public void call(TweetInfo tweetInfo) throws Exception {
                         tweetInfoAccumulator.add(tweetInfo);
+                        tweetIDAccumulator.add(1);
                     }
                 });
 
