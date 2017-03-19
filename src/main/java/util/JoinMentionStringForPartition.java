@@ -43,7 +43,8 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 			//old
 			//for (Row row : tmpMentionList) {
 			//logger.info("collectAccumulator length:"+collectionAccumulator.value().size());
-			for (int i = (int) tweetData.getTweetId() + 1; i < tweetInfos.size(); i++) {
+            System.out.println("tweetInfo size:"+tweetInfos.size());
+            for (int i = (int) tweetData.getTweetId() + 1; i < tweetInfos.size(); i++) {
 				TweetInfo tweetInfo = tweetInfos.get(i);
 				//for(TweetInfo tweetInfo:tweetInfos){
 				//old

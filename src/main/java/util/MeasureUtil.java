@@ -1,6 +1,7 @@
 package util;
 
 import breeze.linalg.DenseVector;
+import edu.nju.pasalab.marlin.matrix.BlockMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -28,7 +29,7 @@ public class MeasureUtil {
     public static double getKLDivergence(DenseVecMatrix vDVM, DenseVecMatrix wDVM, DenseVecMatrix hDVM , DoubleAccumulator KLDSumAccumulator){
 //        final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
         double dbResult;
-        DenseVecMatrix whDVM = (DenseVecMatrix) wDVM.multiply(hDVM,CmdArgs.cores);
+        DenseVecMatrix whDVM = ((BlockMatrix) wDVM.multiply(hDVM,CmdArgs.cores)).toDenseVecMatrix();
         whDVM.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
         DenseVecMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,vDVM,whDVM);
         loginSide.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());

@@ -35,6 +35,7 @@ import util.nmf.NMF;
 import util.tfidf.TFIDF;
 import vo.TweetInfo;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -65,11 +66,12 @@ public class TopicMain {
                 });
 
                 //for local build
-                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+//                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+                System.setProperty("spark.hadoop.dfs.replication", "1");
 
                 sparkSession = SparkSession.builder()
                         //for local build
-                        .master("local")
+//                        .master("local")
                         .appName("TopicDerivation")
                         .config("spark.sql.warehouse.dir", "file:///")
                         .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
@@ -79,15 +81,14 @@ public class TopicMain {
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
 
-//                double[][] dbArray = new double[2][2];
-////
-//                for(int x=0;x<2;x++){
+//                double[][] dbArray = new double[3][2];
+//
+//                for(int x=0;x<3;x++){
 //                    for(int y=0;y<2;y++){
 //                        dbArray[x][y]=(x+y)*2;
 //                    }
 //                }
 //                DenseVecMatrix dvm = new DenseVecMatrix(sc.sc(), dbArray, 2);
-//
 
                 final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
 
@@ -102,7 +103,8 @@ public class TopicMain {
                 //System.out.println("stringJavaRDD mem size:"+ SizeEstimator.estimate(stringJavaRDD));
 
                 SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
-                String outFilePath = cmdArgs.outputFilePath + "_" + sdf.format((Date) broadcastCurrDate.getValue());
+                cmdArgs.outputFilePath = cmdArgs.outputFilePath + File.separator;
+                String outFilePath = cmdArgs.outputFilePath + "result_" + sdf.format((Date) broadcastCurrDate.getValue());
                 double maxCoherenceValue = -Double.MAX_VALUE;
                 ObjectArrayList<String[]> topicWordList = new ObjectArrayList<>();
 
@@ -126,7 +128,7 @@ public class TopicMain {
                         TweetInfo tweet = new TweetInfo();
                         //tweet.setTweetId(tweetIDAccumulator.value());
                         //logger.info("tweetIDAccumulator.value():"+tweetIDAccumulator.value());
-                        //System.out.println("tweet id:"+tweetIDAccumulator.value());
+                        System.out.println("tweet id:"+tweetIDAccumulator.value());
 
                         tweet.setDateString(splitStrings[2]);
                         tweet.setUserName(splitStrings[4]);
@@ -215,8 +217,8 @@ public class TopicMain {
                 if (cmdArgs.model.equals("vector")) {
                     logger.info("compute vector!");
                     System.out.println("compute vector!");
-                    String corpusFilePath = cmdArgs.outputFilePath + "_corpus_" + sdf.format((Date) broadcastCurrDate.getValue());
-                    String wordVectorFilePath = cmdArgs.outputFilePath + "_wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
+                    String corpusFilePath = cmdArgs.outputFilePath + "corpus_" + sdf.format((Date) broadcastCurrDate.getValue());
+                    String wordVectorFilePath = cmdArgs.outputFilePath + "wordVector_" + sdf.format((Date) broadcastCurrDate.getValue());
                     Dataset<Row> tweetDS = ds.select("tweetId", "tweet");
                     Dataset<Row> filterDS = sparkSession.createDataFrame(tweetDS.toJavaRDD(), schemaTFIDF);
                     TopicUtil.transformToVector(filterDS, corpusFilePath, wordVectorFilePath);

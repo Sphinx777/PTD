@@ -1,6 +1,7 @@
 package util.nmf;
 
 import breeze.linalg.DenseVector;
+import edu.nju.pasalab.marlin.matrix.BlockMatrix;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import edu.nju.pasalab.marlin.utils.MTUtils;
 import edu.nju.pasalab.marlin.utils.UniformGenerator;
@@ -141,7 +142,7 @@ public class NMF implements Serializable {
             //logger.info("start to compute H--W:"+originalW.numRows()+","+originalW.numCols()+";H:"+originalH.numRows()+","+originalH.numCols());
             //System.out.println("start to compute H");
 
-            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wTranMatrix.multiply(V, CmdArgs.cores),(DenseVecMatrix) ((DenseVecMatrix) wTranMatrix.multiply(originalW,CmdArgs.cores)).multiply(originalH,CmdArgs.cores));
+            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,((BlockMatrix) wTranMatrix.multiply(V, CmdArgs.cores)).toDenseVecMatrix(),((BlockMatrix) ((BlockMatrix) wTranMatrix.multiply(originalW,CmdArgs.cores)).toDenseVecMatrix().multiply(originalH,CmdArgs.cores)).toDenseVecMatrix());
 		    HUpdateMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
             newH = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalH, HUpdateMatrix);
             newH.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
@@ -205,7 +206,7 @@ public class NMF implements Serializable {
 //				});
 //				tmpWUpdate2.rows().toJavaRDD().collect();
 
-                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, V.toBlockMatrix(1,1).multiply(hTranMatrix.toBlockMatrix(1,1)).toDenseVecMatrix(),(DenseVecMatrix) ((DenseVecMatrix) originalW.multiply(originalH,CmdArgs.cores)).multiply(hTranMatrix,CmdArgs.cores));
+                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, ((BlockMatrix)V.multiply(hTranMatrix,CmdArgs.cores)).toDenseVecMatrix(),(DenseVecMatrix) ((BlockMatrix)((BlockMatrix) originalW.multiply(originalH,CmdArgs.cores)).toDenseVecMatrix().multiply(hTranMatrix,CmdArgs.cores)).toDenseVecMatrix());
                 WUpdateMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
                 newW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply, originalW,WUpdateMatrix);
                 newW.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
