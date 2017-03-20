@@ -5,13 +5,21 @@ import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.Progressable;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.Optional;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFunction;
-import org.apache.spark.ml.feature.*;
+import org.apache.spark.ml.feature.RegexTokenizer;
+import org.apache.spark.ml.feature.StopWordsRemover;
+import org.apache.spark.ml.feature.Word2Vec;
+import org.apache.spark.ml.feature.Word2VecModel;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.storage.StorageLevel;
@@ -19,8 +27,11 @@ import org.apache.spark.util.SizeEstimator;
 import scala.Tuple2;
 import vo.TweetInfo;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.URI;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -343,23 +354,58 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
         model.getVectors().toJavaRDD().saveAsTextFile(wordVectorFilePath);
     }
 
-    public static ObjectArrayList<String[]> readTopicWordList(String inputTopicWordPath){
+    public static ObjectArrayList<String[]> readTopicWordList(JavaSparkContext sc, String inputTopicWordPath){
         ObjectArrayList<String[]> topicWordList = new ObjectArrayList<String[]>();
-        BufferedReader br = null;
+        //BufferedReader br = null;
         try {
-            br = new BufferedReader(new FileReader(inputTopicWordPath));
-            String line;
-            while ((line=br.readLine()) != null) {
-                if(line.trim().length()==0){
-                    continue;
-                }
-                topicWordList.add(line.split("\\s+"));
+            JavaRDD<String> stringJavaRDD = sc.textFile(inputTopicWordPath,1);
+            List<String> tmpStrList = stringJavaRDD.collect();
+            for(String string:tmpStrList){
+                topicWordList.add(string.split("\\s+"));
             }
         }catch (Exception ex){
             ex.printStackTrace();
         }
 
         return topicWordList;
+    }
+
+    public static void writeParameter(String outFilePath){
+        String paraFilePath = outFilePath + File.separator + "parameter";
+        FileSystem fileSystem;
+        BufferedWriter br;
+        try {
+            fileSystem = FileSystem.get(new File(paraFilePath).toURI(),new Configuration());
+            Path file = new Path(paraFilePath);
+            if(fileSystem.exists(file)){
+                fileSystem.delete(file,true);
+            }
+
+            OutputStream os = fileSystem.create(file,
+                    new Progressable() {
+                        @Override
+                        public void progress() {
+                            System.out.println("...bytes written...");
+                        }
+                    }
+            );
+
+            br = new BufferedWriter(new OutputStreamWriter(os , "UTF-8"));
+            br.write("inputFilePath(-input):"+CmdArgs.inputFilePath+TopicConstant.LINE_BREAKER);
+            br.write("outputFilePath(-output):"+CmdArgs.outputFilePath+TopicConstant.LINE_BREAKER);
+            br.write("coherenceFilePath(-cohInput):"+CmdArgs.coherenceFilePath+TopicConstant.LINE_BREAKER);
+
+            br.write("model(-model):"+CmdArgs.model+TopicConstant.LINE_BREAKER);
+            br.write("numIters(-iters):"+CmdArgs.numIters+TopicConstant.LINE_BREAKER);
+            br.write("numFactors(-factor):"+CmdArgs.numFactors+TopicConstant.LINE_BREAKER);
+            br.write("numTopWords(-top):"+CmdArgs.numTopWords+TopicConstant.LINE_BREAKER);
+            br.write("cores(-cores):"+CmdArgs.cores+TopicConstant.LINE_BREAKER);
+
+            br.close();
+            fileSystem.close();
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
     }
 
     //coordinate matrix version

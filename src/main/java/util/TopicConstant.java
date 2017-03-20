@@ -7,6 +7,7 @@ public class TopicConstant {
 	public static final String SEMICOLON_DELIMITER=";";
 	public static final String SPACE_DELIMITER=" ";
 	public static final String DOUBLE_QUOTE_DELIMITER="\"";
+	public static final String LINE_BREAKER=System.getProperty("line.separator");
 	public enum MatrixOperation {
 		Mutiply,
 		Divide

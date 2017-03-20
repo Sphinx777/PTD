@@ -104,7 +104,12 @@ public class TopicMain {
 
                 SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
                 cmdArgs.outputFilePath = cmdArgs.outputFilePath + File.separator;
+
                 String outFilePath = cmdArgs.outputFilePath + "result_" + sdf.format((Date) broadcastCurrDate.getValue());
+                String resultPath = outFilePath + File.separator + "result";
+
+                TopicUtil.writeParameter(outFilePath);
+
                 double maxCoherenceValue = -Double.MAX_VALUE;
                 ObjectArrayList<String[]> topicWordList = new ObjectArrayList<>();
 
@@ -128,7 +133,7 @@ public class TopicMain {
                         TweetInfo tweet = new TweetInfo();
                         //tweet.setTweetId(tweetIDAccumulator.value());
                         //logger.info("tweetIDAccumulator.value():"+tweetIDAccumulator.value());
-                        System.out.println("tweet id:"+tweetIDAccumulator.value());
+                        //System.out.println("tweet id:"+tweetIDAccumulator.value());
 
                         tweet.setDateString(splitStrings[2]);
                         tweet.setUserName(splitStrings[4]);
@@ -425,10 +430,10 @@ public class TopicMain {
                     CollectionAccumulator<String[]> topicWordAccumulator = sc.sc().collectionAccumulator();
                     JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(new Object2ObjectOpenHashMap(tfidf.getTweetIDMap()),cmdArgs.numTopWords,topicWordAccumulator));
 
-                    System.out.println("outFilePath:"+outFilePath);
-                    logger.info("outFilePath:"+outFilePath);
+                    System.out.println("resultPath:"+resultPath);
+                    logger.info("resultPath:"+resultPath);
                     System.out.println("jsonRDD mem size:"+SizeEstimator.estimate(jsonRDD));
-                    jsonRDD.coalesce(1,true).saveAsTextFile(outFilePath);
+                    jsonRDD.coalesce(1,true).saveAsTextFile(resultPath);
 
                     logger.info("get top topic word list!");
                     System.out.println("get top topic word list!");
@@ -444,7 +449,7 @@ public class TopicMain {
                     //model = "coherence"
                     logger.info("read topic word list!");
                     System.out.println("read topic word list!");
-                    topicWordList = new ObjectArrayList<String[]>(TopicUtil.readTopicWordList(cmdArgs.coherenceFilePath));
+                    topicWordList = new ObjectArrayList<String[]>(TopicUtil.readTopicWordList(sc , cmdArgs.coherenceFilePath));
                 }
 
                 //get the topic coherence value
