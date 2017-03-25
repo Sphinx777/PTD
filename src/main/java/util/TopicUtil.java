@@ -27,10 +27,7 @@ import org.apache.spark.util.SizeEstimator;
 import scala.Tuple2;
 import vo.TweetInfo;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.net.URI;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -372,53 +369,92 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
     public static void writeParameter(String outFilePath,Configuration conf){
         String paraFilePath = outFilePath + File.separator + "parameter";
-        FileSystem hdfsFS;
+        FileSystem hdfsFS; //for hdfs
         BufferedWriter br;
         try {
-            logger.info("fs.default.name:"+conf.get("fs.defaultFS"));
             logger.info("the outFilepath:"+outFilePath);
 
-            hdfsFS = FileSystem.get(conf);
-            Path folderPath = new Path(outFilePath);
+            if(outFilePath.startsWith("hdfs://")) {
+                logger.info("fs.default.name:" + conf.get("fs.defaultFS"));
+                hdfsFS = FileSystem.get(conf);
+                Path folderPath = new Path(outFilePath);
 
-            //check result file
-            if(hdfsFS.exists(folderPath)){
-                logger.info("the outFile exist , so delete!");
-                hdfsFS.delete(folderPath,true);
-            }else{
-                logger.info("the outFile is not exist , so create!");
-                hdfsFS.mkdirs(folderPath);
-            }
+                //check result file
+                if (hdfsFS.exists(folderPath)) {
+                    logger.info("the outFile exist , so delete!");
+                    hdfsFS.delete(folderPath, true);
+                } else {
+                    logger.info("the outFile is not exist , so create!");
+                    hdfsFS.mkdirs(folderPath);
+                }
 
-            //check parameter file
-            Path file = new Path(paraFilePath);
-            if(hdfsFS.exists(file)){
-                hdfsFS.delete(file,true);
-            }
+                //check parameter file
+                Path hdfsFilePath = new Path(paraFilePath);
+                if (hdfsFS.exists(hdfsFilePath)) {
+                    hdfsFS.delete(hdfsFilePath, true);
+                }
 
-            OutputStream os = hdfsFS.create(file,
-                    new Progressable() {
-                        @Override
-                        public void progress() {
-                            System.out.println("...bytes written...");
+                OutputStream os = hdfsFS.create(hdfsFilePath,
+                        new Progressable() {
+                            @Override
+                            public void progress() {
+                                System.out.println("...bytes written...");
+                            }
                         }
-                    }
-            );
+                );
 
-            br = new BufferedWriter(new OutputStreamWriter(os , "UTF-8"));
-            br.write("inputFilePath(-input):"+CmdArgs.inputFilePath+TopicConstant.LINE_BREAKER);
-            br.write("outputFilePath(-output):"+CmdArgs.outputFilePath+TopicConstant.LINE_BREAKER);
-            br.write("coherenceFilePath(-cohInput):"+CmdArgs.coherenceFilePath+TopicConstant.LINE_BREAKER);
+                br = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
+                br.write("inputFilePath(-input):" + CmdArgs.inputFilePath + TopicConstant.LINE_BREAKER);
+                br.write("outputFilePath(-output):" + CmdArgs.outputFilePath + TopicConstant.LINE_BREAKER);
+                br.write("coherenceFilePath(-cohInput):" + CmdArgs.coherenceFilePath + TopicConstant.LINE_BREAKER);
 
-            br.write("model(-model):"+CmdArgs.model+TopicConstant.LINE_BREAKER);
-            br.write("numIters(-iters):"+CmdArgs.numIters+TopicConstant.LINE_BREAKER);
-            br.write("numFactors(-factor):"+CmdArgs.numFactors+TopicConstant.LINE_BREAKER);
-            br.write("numTopWords(-top):"+CmdArgs.numTopWords+TopicConstant.LINE_BREAKER);
-            br.write("cores(-cores):"+CmdArgs.cores+TopicConstant.LINE_BREAKER);
-            br.write("numSample(-sample):"+CmdArgs.numSample);
+                br.write("model(-model):" + CmdArgs.model + TopicConstant.LINE_BREAKER);
+                br.write("numIters(-iters):" + CmdArgs.numIters + TopicConstant.LINE_BREAKER);
+                br.write("numFactors(-factor):" + CmdArgs.numFactors + TopicConstant.LINE_BREAKER);
+                br.write("numTopWords(-top):" + CmdArgs.numTopWords + TopicConstant.LINE_BREAKER);
+                br.write("cores(-cores):" + CmdArgs.cores + TopicConstant.LINE_BREAKER);
+                br.write("numSample(-sample):" + CmdArgs.numSample);
 
-            br.close();
-            hdfsFS.close();
+                br.close();
+                hdfsFS.close();
+            }else{
+                outFilePath = outFilePath.replace("file://","");
+
+                logger.info("OK , create local file:"+outFilePath);
+                File folder = new File(outFilePath);
+
+                //check result folder
+                if (folder.exists()) {
+                    logger.info("the outFile exist , so delete!");
+                    folder.delete();
+                } else {
+                    logger.info("the outFile is not exist , so create!");
+                    folder.mkdirs();
+                }
+
+                paraFilePath = paraFilePath.replace("file://","");
+                System.out.println("the parameter path:"+paraFilePath);
+                //check parameter file
+                File paraFile = new File(paraFilePath);
+                if (paraFile.exists()) {
+                    paraFile.delete();
+                }
+
+                PrintWriter writer = new PrintWriter(paraFilePath, "UTF-8");
+
+                writer.write("inputFilePath(-input):" + CmdArgs.inputFilePath + TopicConstant.LINE_BREAKER);
+                writer.write("outputFilePath(-output):" + CmdArgs.outputFilePath + TopicConstant.LINE_BREAKER);
+                writer.write("coherenceFilePath(-cohInput):" + CmdArgs.coherenceFilePath + TopicConstant.LINE_BREAKER);
+
+                writer.write("model(-model):" + CmdArgs.model + TopicConstant.LINE_BREAKER);
+                writer.write("numIters(-iters):" + CmdArgs.numIters + TopicConstant.LINE_BREAKER);
+                writer.write("numFactors(-factor):" + CmdArgs.numFactors + TopicConstant.LINE_BREAKER);
+                writer.write("numTopWords(-top):" + CmdArgs.numTopWords + TopicConstant.LINE_BREAKER);
+                writer.write("cores(-cores):" + CmdArgs.cores + TopicConstant.LINE_BREAKER);
+                writer.write("numSample(-sample):" + CmdArgs.numSample);
+
+                writer.close();
+            }
         }catch (Exception ex){
             ex.printStackTrace();
         }
