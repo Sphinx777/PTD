@@ -370,18 +370,33 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
         return topicWordList;
     }
 
-    public static void writeParameter(String outFilePath){
+    public static void writeParameter(String outFilePath,Configuration conf){
         String paraFilePath = outFilePath + File.separator + "parameter";
-        FileSystem fileSystem;
+        FileSystem hdfsFS;
         BufferedWriter br;
         try {
-            fileSystem = FileSystem.get(new File(paraFilePath).toURI(),new Configuration());
-            Path file = new Path(paraFilePath);
-            if(fileSystem.exists(file)){
-                fileSystem.delete(file,true);
+            logger.info("fs.default.name:"+conf.get("fs.defaultFS"));
+            logger.info("the outFilepath:"+outFilePath);
+
+            hdfsFS = FileSystem.get(conf);
+            Path folderPath = new Path(outFilePath);
+
+            //check result file
+            if(hdfsFS.exists(folderPath)){
+                logger.info("the outFile exist , so delete!");
+                hdfsFS.delete(folderPath,true);
+            }else{
+                logger.info("the outFile is not exist , so create!");
+                hdfsFS.mkdirs(folderPath);
             }
 
-            OutputStream os = fileSystem.create(file,
+            //check parameter file
+            Path file = new Path(paraFilePath);
+            if(hdfsFS.exists(file)){
+                hdfsFS.delete(file,true);
+            }
+
+            OutputStream os = hdfsFS.create(file,
                     new Progressable() {
                         @Override
                         public void progress() {
@@ -400,9 +415,10 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
             br.write("numFactors(-factor):"+CmdArgs.numFactors+TopicConstant.LINE_BREAKER);
             br.write("numTopWords(-top):"+CmdArgs.numTopWords+TopicConstant.LINE_BREAKER);
             br.write("cores(-cores):"+CmdArgs.cores+TopicConstant.LINE_BREAKER);
+            br.write("numSample(-sample):"+CmdArgs.numSample);
 
             br.close();
-            fileSystem.close();
+            hdfsFS.close();
         }catch (Exception ex){
             ex.printStackTrace();
         }

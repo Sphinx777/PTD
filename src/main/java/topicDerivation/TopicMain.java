@@ -81,6 +81,14 @@ public class TopicMain {
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
 
+                final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
+
+                SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
+                cmdArgs.outputFilePath = cmdArgs.outputFilePath + File.separator;
+
+                String outFilePath = cmdArgs.outputFilePath + "result_" + sdf.format((Date) broadcastCurrDate.getValue());
+                String resultPath = outFilePath + File.separator + "result";
+
 //                double[][] dbArray = new double[3][2];
 //
 //                for(int x=0;x<3;x++){
@@ -90,7 +98,7 @@ public class TopicMain {
 //                }
 //                DenseVecMatrix dvm = new DenseVecMatrix(sc.sc(), dbArray, 2);
 
-                final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
+
 
                 StructType schema = new StructType().add("polarity", "string").add("oldTweetId", "double").add("date", "string")
                         .add("noUse", "string").add("userName", "string").add("tweet", "string")
@@ -102,13 +110,12 @@ public class TopicMain {
                 JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,6);
                 //System.out.println("stringJavaRDD mem size:"+ SizeEstimator.estimate(stringJavaRDD));
 
-                SimpleDateFormat sdf = new SimpleDateFormat(TopicConstant.OUTPUT_FILE_DATE_FORMAT);
-                cmdArgs.outputFilePath = cmdArgs.outputFilePath + File.separator;
+                if(cmdArgs.numSample!=0) {
+                    logger.info("sampling:"+cmdArgs.numSample);
+                    stringJavaRDD = sc.parallelize(stringJavaRDD.takeSample(false, cmdArgs.numSample));
+                }
 
-                String outFilePath = cmdArgs.outputFilePath + "result_" + sdf.format((Date) broadcastCurrDate.getValue());
-                String resultPath = outFilePath + File.separator + "result";
-
-                TopicUtil.writeParameter(outFilePath);
+                TopicUtil.writeParameter(outFilePath,sc.hadoopConfiguration());
 
                 double maxCoherenceValue = -Double.MAX_VALUE;
                 ObjectArrayList<String[]> topicWordList = new ObjectArrayList<>();
