@@ -416,7 +416,7 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
                 br.write("numSample(-sample):" + CmdArgs.numSample);
 
                 br.close();
-                hdfsFS.close();
+                //hdfsFS.close();
             }else{
                 outFilePath = outFilePath.replace("file://","");
 
