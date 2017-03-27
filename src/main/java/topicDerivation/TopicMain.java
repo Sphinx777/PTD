@@ -181,31 +181,32 @@ public class TopicMain {
                     }
                 });
 
-                JavaPairRDD<TweetInfo,Long> tweetInfoZipPairRDD = oldTweetJavaRDD.zipWithIndex();
+                JavaRDD<TweetInfo> tweetJavaRDD;
+                if(!cmdArgs.model.equals("coherence")) {
+                    JavaPairRDD<TweetInfo, Long> tweetInfoZipPairRDD = oldTweetJavaRDD.zipWithIndex();
 
-                JavaRDD<TweetInfo> tweetJavaRDD = tweetInfoZipPairRDD.mapPartitions(new FlatMapFunction<Iterator<Tuple2<TweetInfo, Long>>, TweetInfo>() {
-                    @Override
-                    public Iterator<TweetInfo> call(Iterator<Tuple2<TweetInfo, Long>> tuple2Iterator) throws Exception {
-                        ArrayList<TweetInfo> tweetInfoArrayList = new ArrayList<TweetInfo>();
-                        while(tuple2Iterator.hasNext()){
-                            Tuple2<TweetInfo,Long> tuple2 = tuple2Iterator.next();
-                            TweetInfo tweetInfo = tuple2._1();
-                            tweetInfo.setTweetId(tuple2._2().longValue());
-                            tweetInfoArrayList.add(tweetInfo);
+                    tweetJavaRDD = tweetInfoZipPairRDD.mapPartitions(new FlatMapFunction<Iterator<Tuple2<TweetInfo, Long>>, TweetInfo>() {
+                        @Override
+                        public Iterator<TweetInfo> call(Iterator<Tuple2<TweetInfo, Long>> tuple2Iterator) throws Exception {
+                            ArrayList<TweetInfo> tweetInfoArrayList = new ArrayList<TweetInfo>();
+                            while (tuple2Iterator.hasNext()) {
+                                Tuple2<TweetInfo, Long> tuple2 = tuple2Iterator.next();
+                                TweetInfo tweetInfo = tuple2._1();
+                                tweetInfo.setTweetId(tuple2._2().longValue());
+                                tweetInfoArrayList.add(tweetInfo);
+                            }
+
+                            return tweetInfoArrayList.iterator();
                         }
+                    });
 
-                        return tweetInfoArrayList.iterator();
-                    }
-                });
-
-                logger.info("tweetJavaRDD compute finish!");
-
+                    logger.info("tweetJavaRDD compute finish!");
+                }else {
+                    tweetJavaRDD = oldTweetJavaRDD;
+                }
                 System.out.println("tweetJavaRDD mem size:"+SizeEstimator.estimate(tweetJavaRDD));
 
                 tweetJavaRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
-
-                logger.info("tweetInfoAccumulator size:"+tweetInfoAccumulator.value().size());
-                System.out.println("tweetInfoAccumulator mem size:"+SizeEstimator.estimate(tweetInfoAccumulator));
 
                 Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
                 Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
@@ -221,6 +222,9 @@ public class TopicMain {
                         tweetIDAccumulator.add(1);
                     }
                 });
+
+                logger.info("tweetInfoAccumulator size:"+tweetInfoAccumulator.value().size());
+                System.out.println("tweetInfoAccumulator mem size:"+SizeEstimator.estimate(tweetInfoAccumulator));
 
                 System.out.println("ds mem size:"+SizeEstimator.estimate(ds));
                 ds.persist(StorageLevel.MEMORY_AND_DISK_SER());
@@ -471,7 +475,6 @@ public class TopicMain {
 
                 double tmpCoherenceValue;
                 Broadcast<Object2IntOpenHashMap<String>> brWordCntMap = sc.broadcast(new Object2IntOpenHashMap<String>());
-                System.out.println("brWordCntMap mem size:"+SizeEstimator.estimate(brWordCntMap));
 
                 logger.info("compute the topic coherence value!");
                 System.out.println("compute the topic coherence value!");
@@ -484,7 +487,11 @@ public class TopicMain {
                     System.out.println("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
 
                     tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession , new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()));
+                    logger.info("current topic coherence:"+tmpCoherenceValue);
+                    System.out.println("current topic coherence:"+tmpCoherenceValue);
                     if (Double.compare(tmpCoherenceValue, maxCoherenceValue) > 0) {
+                        logger.info("new max coherence:"+tmpCoherenceValue);
+                        System.out.println("new max coherence:"+tmpCoherenceValue);
                         maxCoherenceValue = tmpCoherenceValue;
                     }
                     dbAccumulator.add(tmpCoherenceValue);

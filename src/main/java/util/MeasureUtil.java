@@ -253,8 +253,8 @@ public class MeasureUtil {
                 hashKeyAccumulator.add(1);
             }
         }
-        logger.info("wjFound:"+wjFounded);
-        System.out.println("wjFound:"+wjFounded);
+        //logger.info("wjFound:"+wjFounded);
+        //System.out.println("wjFound:"+wjFounded);
     }
 }
 
@@ -340,7 +340,7 @@ class tweetRDD_ForeachFunc2 implements VoidFunction<String>{
                  hashKeyAccumulator.add(1);
             }
         }
-        logger.info("wjFound:"+wjFounded);
-        System.out.println("wjFound:"+wjFounded);
+        //logger.info("wjFound:"+wjFounded);
+        //System.out.println("wjFound:"+wjFounded);
     }
 }

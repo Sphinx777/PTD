@@ -2,6 +2,7 @@ package util;
 
 import breeze.linalg.DenseVector;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -16,6 +17,8 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.Optional;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.api.java.function.VoidFunction;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.ml.feature.RegexTokenizer;
 import org.apache.spark.ml.feature.StopWordsRemover;
 import org.apache.spark.ml.feature.Word2Vec;
@@ -23,6 +26,7 @@ import org.apache.spark.ml.feature.Word2VecModel;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.storage.StorageLevel;
+import org.apache.spark.util.CollectionAccumulator;
 import org.apache.spark.util.SizeEstimator;
 import scala.Tuple2;
 import vo.TweetInfo;
@@ -355,11 +359,27 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
         ObjectArrayList<String[]> topicWordList = new ObjectArrayList<String[]>();
         //BufferedReader br = null;
         try {
-            JavaRDD<String> stringJavaRDD = sc.textFile(inputTopicWordPath,1);
-            List<String> tmpStrList = stringJavaRDD.collect();
-            for(String string:tmpStrList){
-                topicWordList.add(string.split("\\s+"));
-            }
+            JavaRDD<String> stringJavaRDD = sc.textFile(inputTopicWordPath,6);
+            CollectionAccumulator<String[]> brWordList = sc.sc().collectionAccumulator();
+            //List<String> tmpStrList = stringJavaRDD.collect();
+
+            stringJavaRDD.first();
+
+//            stringJavaRDD.foreach(new VoidFunction<String>() {
+//                @Override
+//                public void call(String s) throws Exception {
+//                    brWordList.value().add(s.split("\\s+"));
+//                }
+//            });
+            stringJavaRDD.foreach(new VoidFunction<String>() {
+                @Override
+                public void call(String s) throws Exception {
+                    brWordList.add(s.split("\\s+"));
+                }
+            });
+
+            System.out.println("brWordList.size:"+brWordList.value().size());
+            topicWordList = new ObjectArrayList<>(brWordList.value());
         }catch (Exception ex){
             ex.printStackTrace();
         }
