@@ -2,7 +2,6 @@ package util;
 
 import breeze.linalg.DenseVector;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -18,7 +17,6 @@ import org.apache.spark.api.java.Optional;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.api.java.function.VoidFunction;
-import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.ml.feature.RegexTokenizer;
 import org.apache.spark.ml.feature.StopWordsRemover;
 import org.apache.spark.ml.feature.Word2Vec;
@@ -32,7 +30,6 @@ import scala.Tuple2;
 import vo.TweetInfo;
 
 import java.io.*;
-import java.net.URI;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -188,7 +185,7 @@ public class TopicUtil {
 //                return new Tuple2<String, Double>(entry.i() + TopicConstant.COMMA_DELIMITER + entry.j(), entry.value());
 //            }
 //        });
-tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+//tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
     JavaPairRDD<Object,ObjectArrayList<Object>> tmpDivisorRDD = matDivisor.rows().toJavaRDD().mapToPair(new PairFunction<Tuple2<Object, DenseVector<Object>>, Object, ObjectArrayList<Object>>() {
         @Override
@@ -201,12 +198,12 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
         }
     });
 
-        tmpDivisorRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+        //tmpDivisorRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 //        JavaPairRDD<String, Tuple2<Double, Optional<Double>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
 
      JavaPairRDD<Object,Tuple2<ObjectArrayList<Object>, Optional<ObjectArrayList<Object>>>> tmpRDD = tmpDividendRDD.leftOuterJoin(tmpDivisorRDD);
         System.out.println("tmpRDD mem size:"+ SizeEstimator.estimate(tmpRDD));
-        tmpRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+        //tmpRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 //        class Tuple2MatrixEntryFlatMapFunction implements FlatMapFunction<Tuple2<String, Tuple2<Double, Optional<Double>>>, MatrixEntry> {
 //            private final TopicConstant.MatrixOperation operation;
 
@@ -302,7 +299,7 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
         StopWordsRemover remover = new StopWordsRemover().setInputCol("token").setOutputCol("words");
         Dataset<Row> filterData = remover.transform(wordsData);
-        filterData.persist(StorageLevel.MEMORY_AND_DISK_SER());
+        //filterData.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
         //create corpus
         JavaRDD<TweetInfo> outputCorpusStringRDD = filterData.toJavaRDD().map(new Function<Row, TweetInfo>() {
@@ -324,7 +321,7 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
         return outputCorpusStringRDD;
     }
 
-    public static void transformToVector(Dataset<Row> tweetInfoJavaRDD,String corpusFilePath,String wordVectorFilePath){
+    public static void transformToVector(Dataset<Row> tweetInfoJavaRDD,String corpusFilePath,String wordVectorFilePath)throws  Exception{
         RegexTokenizer regexTokenizer = new RegexTokenizer().setInputCol("tweet").setOutputCol("token").setPattern("\\W").setMinTokenLength(3);
         Dataset<Row> wordsData = regexTokenizer.transform(tweetInfoJavaRDD);
 
@@ -349,10 +346,13 @@ tmpDividendRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
                 .setOutputCol("vector")
                 .setMinCount(0);
 
+        //Computes the vector representation of each word in vocabulary
         Word2VecModel model = word2Vec.fit(filterData);
+        //Transform a sentence column to a vector column to represent the whole sentence
         Dataset<Row> vectorDS = model.transform(filterData);
         filterData.unpersist();
-        model.getVectors().toJavaRDD().saveAsTextFile(wordVectorFilePath);
+
+        model.getVectors().toJavaRDD().coalesce(1,true).saveAsTextFile(wordVectorFilePath);
     }
 
     public static ObjectArrayList<String[]> readTopicWordList(JavaSparkContext sc, String inputTopicWordPath){

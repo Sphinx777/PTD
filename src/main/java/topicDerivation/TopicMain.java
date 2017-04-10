@@ -66,12 +66,12 @@ public class TopicMain {
                 });
 
                 //for local build
-//                System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
+                //System.setProperty("hadoop.home.dir", "D:\\JetBrains\\IntelliJ IDEA Community Edition 2016.2.4");
                 System.setProperty("spark.hadoop.dfs.replication", "1");
 
                 sparkSession = SparkSession.builder()
                         //for local build
-//                        .master("local")
+                        //.master("local")
                         .appName("TopicDerivation")
                         .config("spark.sql.warehouse.dir", "file:///")
                         .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
@@ -110,11 +110,6 @@ public class TopicMain {
                 JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,6);
                 //System.out.println("stringJavaRDD mem size:"+ SizeEstimator.estimate(stringJavaRDD));
 
-                if(cmdArgs.numSample!=0) {
-                    logger.info("sampling:"+cmdArgs.numSample);
-                    stringJavaRDD = sc.parallelize(stringJavaRDD.takeSample(false, cmdArgs.numSample));
-                }
-
                 TopicUtil.writeParameter(outFilePath,sc.hadoopConfiguration());
 
                 double maxCoherenceValue = -Double.MAX_VALUE;
@@ -133,7 +128,7 @@ public class TopicMain {
                 CollectionAccumulator<TweetInfo> tweetInfoAccumulator = sc.sc().collectionAccumulator();
 
                 //set custom javaRDD and compute the mentionMen
-                JavaRDD<TweetInfo> oldTweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
+                JavaRDD<TweetInfo> AllTweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
                     @Override
                     public TweetInfo call(String v1) throws Exception {
                         String[] splitStrings = v1.replaceAll(TopicConstant.DOUBLE_QUOTE_DELIMITER,"").split(TopicConstant.COMMA_DELIMITER);
@@ -181,6 +176,14 @@ public class TopicMain {
                     }
                 });
 
+                JavaRDD<TweetInfo> oldTweetJavaRDD;
+                if(cmdArgs.numSample!=0) {
+                    logger.info("sampling:"+cmdArgs.numSample);
+                    oldTweetJavaRDD = sc.parallelize(AllTweetJavaRDD.takeSample(false, cmdArgs.numSample), cmdArgs.numSample);
+                }else{
+                    oldTweetJavaRDD = AllTweetJavaRDD;
+                }
+
                 JavaRDD<TweetInfo> tweetJavaRDD;
                 if(!cmdArgs.model.equals("coherence")) {
                     JavaPairRDD<TweetInfo, Long> tweetInfoZipPairRDD = oldTweetJavaRDD.zipWithIndex();
@@ -206,7 +209,7 @@ public class TopicMain {
                 }
                 System.out.println("tweetJavaRDD mem size:"+SizeEstimator.estimate(tweetJavaRDD));
 
-                tweetJavaRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+                //tweetJavaRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
                 Encoder<TweetInfo> encoder = Encoders.bean(TweetInfo.class);
                 Dataset<TweetInfo> ds = sparkSession.createDataset(tweetJavaRDD.rdd(), encoder);
@@ -227,7 +230,7 @@ public class TopicMain {
                 System.out.println("tweetInfoAccumulator mem size:"+SizeEstimator.estimate(tweetInfoAccumulator));
 
                 System.out.println("ds mem size:"+SizeEstimator.estimate(ds));
-                ds.persist(StorageLevel.MEMORY_AND_DISK_SER());
+                //ds.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
                 //transform to word vector
                 if (cmdArgs.model.equals("vector")) {
@@ -342,7 +345,7 @@ public class TopicMain {
 
                     //tweetIDAccumulator.reset();
 
-                    sentenceData.persist(StorageLevel.MEMORY_AND_DISK_SER());
+                    //sentenceData.persist(StorageLevel.MEMORY_AND_DISK_SER());
                     TFIDF tfidf = new TFIDF(sentenceData,sc, stringAccumulator);
 
                     logger.info("build tfidf model!");
@@ -426,7 +429,7 @@ public class TopicMain {
 //                    }
 //                    });
                     System.out.println("cmpRDD mem size:"+SizeEstimator.estimate(cmpRDD));
-                    cmpRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+                    //cmpRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
                     //System.out.println("cmpRdd count:"+cmpRDD.count());
                     //logger.info("cmpRdd count:"+cmpRDD.count());
@@ -463,14 +466,25 @@ public class TopicMain {
                     topicWordList = new ObjectArrayList<String[]>(TopicUtil.readTopicWordList(sc , cmdArgs.coherenceFilePath));
                 }
 
+                CollectionAccumulator<TweetInfo> allTweetInfoAccumulator = sc.sc().collectionAccumulator();
+                AllTweetJavaRDD.first();
+
+                AllTweetJavaRDD.foreach(new VoidFunction<TweetInfo>() {
+                    @Override
+                    public void call(TweetInfo tweetInfo) throws Exception {
+                        allTweetInfoAccumulator.add(tweetInfo);
+                    }
+                });
+
                 //get the topic coherence value
-                JavaRDD<String> tweetStrRDD = tweetJavaRDD.map(new Function<TweetInfo, String>() {
+                JavaRDD<String> tweetStrRDD = AllTweetJavaRDD.map(new Function<TweetInfo, String>() {
                     @Override
                     public String call(TweetInfo v1) throws Exception {
                         return v1.getTweet();
                     }
                 });
-                tweetStrRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+                //tweetStrRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
+
                 DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
 
                 double tmpCoherenceValue;
@@ -482,11 +496,14 @@ public class TopicMain {
                 logger.info("the topicWordList length:"+topicWrdListSize);
                 System.out.println("the topicWordList length:"+topicWrdListSize);
 
+                logger.info("the total tweet count:"+allTweetInfoAccumulator.value().size());
+                System.out.println("the total tweet count:"+allTweetInfoAccumulator.value().size());
+
                 for (String[] strings : topicWordList) {
                     logger.info("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
                     System.out.println("strings["+strings.length+"]:"+ String.join(TopicConstant.COMMA_DELIMITER,strings));
 
-                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession , new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()));
+                    tmpCoherenceValue = MeasureUtil.getTopicCoherenceValue(strings, tweetStrRDD, brWordCntMap ,sparkSession , new ObjectArrayList<TweetInfo>(allTweetInfoAccumulator.value()));
                     logger.info("current topic coherence:"+tmpCoherenceValue);
                     System.out.println("current topic coherence:"+tmpCoherenceValue);
                     if (Double.compare(tmpCoherenceValue, maxCoherenceValue) > 0) {
