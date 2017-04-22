@@ -4,6 +4,8 @@ import breeze.linalg.DenseVector;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
+import edu.nju.pasalab.marlin.utils.MTUtils;
+import edu.nju.pasalab.marlin.utils.UniformGenerator;
 import it.unimi.dsi.fastutil.ints.Int2DoubleLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -76,10 +78,30 @@ public class TopicMain {
                         .config("spark.sql.warehouse.dir", "file:///")
                         .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
                         .config("spark.kryo.registrator",TweetInfoKryoRegister.class.getName())
-                        //.config("spark.kryoserializer.buffer.max","2000m")
+                        .config("spark.kryoserializer.buffer.max","2000m")
                         .getOrCreate();
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
+
+                //test
+                if(cmdArgs.model.equals("testCoor")){
+                    logger.info("start to test getCoorMatOption sample number:"+cmdArgs.numSample);
+                    DenseVecMatrix matDividend = MTUtils.randomDenVecMatrix(sc.sc(),cmdArgs.numSample,cmdArgs.numSample,48,new UniformGenerator(0.0,1.0));
+                    matDividend.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
+                    logger.info("matDividend persist print");
+                    matDividend.print();
+
+                    DenseVecMatrix matDivisor = MTUtils.randomDenVecMatrix(sc.sc(),cmdArgs.numSample,cmdArgs.numSample,48,new UniformGenerator(0.0,1.0));
+                    matDivisor.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
+                    logger.info("matDivisor persist print");
+                    matDivisor.print();
+
+                    logger.info("start to compute the getCoorMatOption: subtract");
+                    DenseVecMatrix denseVecMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Subtract,matDividend,matDivisor);
+                    logger.info("result denseVec print");
+                    denseVecMatrix.print();
+                    System.exit(0);
+                }
 
                 final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
 
@@ -107,7 +129,7 @@ public class TopicMain {
                 //read csv file to dataSet
                 //Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(cmdArgs.inputFilePath);
 
-                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,6);
+                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,30);
                 //System.out.println("stringJavaRDD mem size:"+ SizeEstimator.estimate(stringJavaRDD));
 
                 TopicUtil.writeParameter(outFilePath,sc.hadoopConfiguration());
@@ -140,6 +162,8 @@ public class TopicMain {
                         tweet.setDateString(splitStrings[2]);
                         tweet.setUserName(splitStrings[4]);
                         tweet.setTweet(splitStrings[5].replaceAll("(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]",""));
+                        System.out.println("tweet:"+tweet.getTweet());
+                        logger.info("tweet:"+tweet.getTweet());
                         tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
                         tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
                         return tweet;
@@ -207,7 +231,6 @@ public class TopicMain {
                 }else {
                     tweetJavaRDD = oldTweetJavaRDD;
                 }
-                System.out.println("tweetJavaRDD mem size:"+SizeEstimator.estimate(tweetJavaRDD));
 
                 //tweetJavaRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());
 

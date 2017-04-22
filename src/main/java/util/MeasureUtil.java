@@ -11,7 +11,6 @@ import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 import scala.Tuple2;
@@ -29,7 +28,7 @@ public class MeasureUtil {
     public static double getKLDivergence(DenseVecMatrix vDVM, DenseVecMatrix wDVM, DenseVecMatrix hDVM , DoubleAccumulator KLDSumAccumulator){
 //        final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
         double dbResult;
-        DenseVecMatrix whDVM = ((BlockMatrix) wDVM.multiply(hDVM,CmdArgs.cores)).toDenseVecMatrix();
+        DenseVecMatrix whDVM = (DenseVecMatrix) wDVM.multiply(hDVM,CmdArgs.cores);
         //whDVM.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
         DenseVecMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,vDVM,whDVM);
         //loginSide.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
@@ -37,7 +36,7 @@ public class MeasureUtil {
         //logResult.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
         DenseVecMatrix diffPara = whDVM.subtract(vDVM);
         //diffPara.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
-        DenseVecMatrix result = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Mutiply,vDVM,logResult).add(diffPara);
+        DenseVecMatrix result = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Multiply,vDVM,logResult).add(diffPara);
         //result.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 
         //doubleRDD version

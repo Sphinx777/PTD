@@ -9,7 +9,9 @@ public class TopicConstant {
 	public static final String DOUBLE_QUOTE_DELIMITER="\"";
 	public static final String LINE_BREAKER=System.getProperty("line.separator");
 	public enum MatrixOperation {
-		Mutiply,
+		Add,
+		Subtract,
+		Multiply,
 		Divide
 	}
 	public static final String DATE_FORMAT = "EEE MMM dd kk:mm:ss zzz yyyy";
