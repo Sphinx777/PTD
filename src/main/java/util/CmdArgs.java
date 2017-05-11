@@ -30,9 +30,6 @@ public class CmdArgs {
     @Option(name="-cores",usage="Sets compute cores")
     public static int cores = 2;
 
-    @Option(name="-sample",usage="Sets a number of sample")
-    public static int numSample = 0;
-
     @Option(name="-threshold",usage="Sets a number of threshold")
     public static int numThreshold = 3000;
 }

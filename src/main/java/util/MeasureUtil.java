@@ -28,14 +28,19 @@ public class MeasureUtil {
     public static double getKLDivergence(DenseVecMatrix vDVM, DenseVecMatrix wDVM, DenseVecMatrix hDVM , DoubleAccumulator KLDSumAccumulator){
 //        final DoubleAccumulator dbAccumulator = sparkSession.sparkContext().doubleAccumulator();
         double dbResult;
+        logger.info("compute whDVM");
         DenseVecMatrix whDVM = (DenseVecMatrix) wDVM.multiply(hDVM,CmdArgs.cores);
         //whDVM.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
+        logger.info("compute loginSide");
         DenseVecMatrix loginSide = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,vDVM,whDVM);
         //loginSide.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
+        logger.info("compute logResult");
         DenseVecMatrix logResult = getMatrixLogValue(loginSide);
         //logResult.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
+        logger.info("compute diffPara");
         DenseVecMatrix diffPara = whDVM.subtract(vDVM);
         //diffPara.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
+        logger.info("compute KLDivergence result");
         DenseVecMatrix result = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Multiply,vDVM,logResult).add(diffPara);
         //result.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 
@@ -64,6 +69,7 @@ public class MeasureUtil {
 //            }
 //        });
 
+        logger.info("accumulate the KLD");
         //accumulator version
         result.rows().toJavaRDD().foreach(new VoidFunction<Tuple2<Object, DenseVector<Object>>>() {
             @Override
@@ -80,6 +86,7 @@ public class MeasureUtil {
             }
         });
 
+        logger.info("sum the KLDivergence");
         dbResult = KLDSumAccumulator.sum();
         return dbResult;
     }

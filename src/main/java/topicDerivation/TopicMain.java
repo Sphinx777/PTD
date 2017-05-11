@@ -59,6 +59,8 @@ public class TopicMain {
             logger.info("model:"+cmdArgs.model);
 
             if(!cmdArgs.model.equals("")) {
+                double maxCoherenceValue = -Double.MAX_VALUE;
+                ObjectArrayList<String[]> topicWordList = new ObjectArrayList<>();
 
                 logger.info("start");
 
@@ -83,25 +85,11 @@ public class TopicMain {
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
 
-                //test
-                if(cmdArgs.model.equals("testCoor")){
-                    logger.info("start to test getCoorMatOption sample number:"+cmdArgs.numSample);
-                    DenseVecMatrix matDividend = MTUtils.randomDenVecMatrix(sc.sc(),cmdArgs.numSample,cmdArgs.numSample,48,new UniformGenerator(0.0,1.0));
-                    matDividend.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
-                    logger.info("matDividend persist print");
-                    matDividend.print();
+                //add accumulator
+                LongAccumulator tweetIDAccumulator = sc.sc().longAccumulator();
 
-                    DenseVecMatrix matDivisor = MTUtils.randomDenVecMatrix(sc.sc(),cmdArgs.numSample,cmdArgs.numSample,48,new UniformGenerator(0.0,1.0));
-                    matDivisor.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
-                    logger.info("matDivisor persist print");
-                    matDivisor.print();
-
-                    logger.info("start to compute the getCoorMatOption: subtract");
-                    DenseVecMatrix denseVecMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Subtract,matDividend,matDivisor);
-                    logger.info("result denseVec print");
-                    denseVecMatrix.print();
-                    System.exit(0);
-                }
+                //the tweetInfo accumulator
+                CollectionAccumulator<TweetInfo> tweetInfoAccumulator = sc.sc().collectionAccumulator();
 
                 final Broadcast<Date> broadcastCurrDate = sc.broadcast(new Date());
 
@@ -120,8 +108,6 @@ public class TopicMain {
 //                }
 //                DenseVecMatrix dvm = new DenseVecMatrix(sc.sc(), dbArray, 2);
 
-
-
                 StructType schema = new StructType().add("polarity", "string").add("oldTweetId", "double").add("date", "string")
                         .add("noUse", "string").add("userName", "string").add("tweet", "string")
                         .add("mentionMen", "string").add("userInteraction", "string");
@@ -129,25 +115,18 @@ public class TopicMain {
                 //read csv file to dataSet
                 //Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(cmdArgs.inputFilePath);
 
-                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,30);
-                //System.out.println("stringJavaRDD mem size:"+ SizeEstimator.estimate(stringJavaRDD));
-
+                //write parameter
                 TopicUtil.writeParameter(outFilePath,sc.hadoopConfiguration());
-
-                double maxCoherenceValue = -Double.MAX_VALUE;
-                ObjectArrayList<String[]> topicWordList = new ObjectArrayList<>();
 
                 //drop the no use column
                // Dataset<Row> currDataset = csvDataset.drop("polarity", "noUse");
 
-                //add accumulator
-                LongAccumulator tweetIDAccumulator = sc.sc().longAccumulator();
-
                 logger.info("compute the mentionMen!");
                 System.out.println("compute the mentionMen!");
 
-                //the tweetInfo accumulator
-                CollectionAccumulator<TweetInfo> tweetInfoAccumulator = sc.sc().collectionAccumulator();
+
+                //single file version
+                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,5000);
 
                 //set custom javaRDD and compute the mentionMen
                 JavaRDD<TweetInfo> AllTweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
@@ -200,17 +179,128 @@ public class TopicMain {
                     }
                 });
 
-                JavaRDD<TweetInfo> oldTweetJavaRDD;
-                if(cmdArgs.numSample!=0) {
-                    logger.info("sampling:"+cmdArgs.numSample);
-                    oldTweetJavaRDD = sc.parallelize(AllTweetJavaRDD.takeSample(false, cmdArgs.numSample), cmdArgs.numSample);
-                }else{
-                    oldTweetJavaRDD = AllTweetJavaRDD;
-                }
+                //split file version
+                //JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,cmdArgs.numSample);
+//                JavaPairRDD<String,String> wholeTextFilesRDD = sc.wholeTextFiles(cmdArgs.inputFilePath);
+//
+//                JavaRDD<TweetInfo> AllTweetJavaRDD = wholeTextFilesRDD.mapPartitions(new FlatMapFunction<Iterator<Tuple2<String, String>>, TweetInfo>() {
+//                    @Override
+//                    public Iterator<TweetInfo> call(Iterator<Tuple2<String, String>> tuple2Iterator) throws Exception {
+//                        ObjectArrayList<TweetInfo> tweetInfos = new ObjectArrayList<TweetInfo>();
+//                        String[] tweetLineList;
+//                        while(tuple2Iterator.hasNext()) {
+//                            tweetLineList = tuple2Iterator.next()._2().split(TopicConstant.LINE_BREAKER);
+//
+//                            for (String line : tweetLineList) {
+//                                String[] splitStrings = line.replaceAll(TopicConstant.DOUBLE_QUOTE_DELIMITER, "").split(TopicConstant.COMMA_DELIMITER);
+//                                TweetInfo tweet = new TweetInfo();
+//                                //logger.info("tweetIDAccumulator.value():"+tweetIDAccumulator.value());
+//                                //System.out.println("tweet id:"+tweetIDAccumulator.value());
+//
+//                                tweet.setDateString(splitStrings[2]);
+//                                tweet.setUserName(splitStrings[4]);
+//                                tweet.setTweet(splitStrings[5].replaceAll("(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]", ""));
+//                                //System.out.println("tweet:" + tweet.getTweet());
+//                                logger.info("tweet:" + tweet.getTweet());
+//                                tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
+//                                tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
+//
+//                                tweetInfos.add(tweet);
+//                            }
+//                        }
+//                        return tweetInfos.iterator();
+//                    }
+//
+//                    //for po:interaction based on people
+//                    private String setMentionMen(String userName, String tweet) {
+//                        ArrayList<String> arr = new ArrayList<String>();
+//                        arr.add(userName.trim());
+//                        String[] strings = tweet.split("\\s+");
+//                        for (String str : strings) {
+//                            if (str.indexOf("@") != -1) {
+//                                arr.add(str.trim().replace("@", ""));
+//                            }
+//                        }
+//                        return String.join(TopicConstant.COMMA_DELIMITER, arr);
+//                    }
+//
+//                    //for act:interaction based on user actions
+//                    private String setUserInteraction(String userName, String tweetString) {
+//                        ArrayList<String> arr = new ArrayList<String>();
+//                        String[] strings = tweetString.split("\\s+");
+//                        String returnStr = userName;
+//                        //find begin with @xxx
+//                        //find begin with RT empty @XXX empty or :
+//                        if (strings.length > 0) {
+//                            if (strings[0].indexOf("@") != -1 && strings[0].length() > 1) {
+//                                returnStr += TopicConstant.COMMA_DELIMITER + strings[0].replace("@", "");
+//                            } else if (strings[0].equals("RT") && strings.length > 1) {
+//                                returnStr += TopicConstant.COMMA_DELIMITER + strings[1].replace(":", "").replace("@", "");
+//                            }
+//                        }
+//                        return returnStr;
+//                    }
+//                });
+
+//                JavaRDD<TweetInfo> AllTweetJavaRDD = wholeTextFilesRDD.flatMap(new FlatMapFunction<Tuple2<String, String>, TweetInfo>() {
+//                    @Override
+//                    public Iterator<TweetInfo> call(Tuple2<String, String> stringStringTuple2) throws Exception {
+//                        String[] tweetLineList = stringStringTuple2._2().split(TopicConstant.LINE_BREAKER);
+//                        ObjectArrayList<TweetInfo> tweetInfos = new ObjectArrayList<TweetInfo>();
+//
+//                        for(String line:tweetLineList) {
+//                            String[] splitStrings = line.replaceAll(TopicConstant.DOUBLE_QUOTE_DELIMITER, "").split(TopicConstant.COMMA_DELIMITER);
+//                            TweetInfo tweet = new TweetInfo();
+//                            //logger.info("tweetIDAccumulator.value():"+tweetIDAccumulator.value());
+//                            //System.out.println("tweet id:"+tweetIDAccumulator.value());
+//
+//                            tweet.setDateString(splitStrings[2]);
+//                            tweet.setUserName(splitStrings[4]);
+//                            tweet.setTweet(splitStrings[5].replaceAll("(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]", ""));
+//                            //System.out.println("tweet:" + tweet.getTweet());
+//                            logger.info("tweet:" + tweet.getTweet());
+//                            tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
+//                            tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
+//
+//                            tweetInfos.add(tweet);
+//                        }
+//                        return tweetInfos.iterator();
+//                    }
+//
+//                    //for po:interaction based on people
+//                    private String setMentionMen(String userName, String tweet) {
+//                        ArrayList<String> arr = new ArrayList<String>();
+//                        arr.add(userName.trim());
+//                        String[] strings = tweet.split("\\s+");
+//                        for (String str : strings) {
+//                            if (str.indexOf("@") != -1) {
+//                                arr.add(str.trim().replace("@", ""));
+//                            }
+//                        }
+//                        return String.join(TopicConstant.COMMA_DELIMITER, arr);
+//                    }
+//
+//                    //for act:interaction based on user actions
+//                    private String setUserInteraction(String userName, String tweetString) {
+//                        ArrayList<String> arr = new ArrayList<String>();
+//                        String[] strings = tweetString.split("\\s+");
+//                        String returnStr = userName;
+//                        //find begin with @xxx
+//                        //find begin with RT empty @XXX empty or :
+//                        if (strings.length > 0) {
+//                            if (strings[0].indexOf("@") != -1 && strings[0].length() > 1) {
+//                                returnStr += TopicConstant.COMMA_DELIMITER + strings[0].replace("@", "");
+//                            } else if (strings[0].equals("RT") && strings.length > 1) {
+//                                returnStr += TopicConstant.COMMA_DELIMITER + strings[1].replace(":", "").replace("@", "");
+//                            }
+//                        }
+//                        return returnStr;
+//                    }
+//                });
 
                 JavaRDD<TweetInfo> tweetJavaRDD;
                 if(!cmdArgs.model.equals("coherence")) {
-                    JavaPairRDD<TweetInfo, Long> tweetInfoZipPairRDD = oldTweetJavaRDD.zipWithIndex();
+                    JavaPairRDD<TweetInfo, Long> tweetInfoZipPairRDD = AllTweetJavaRDD.zipWithIndex();
 
                     tweetJavaRDD = tweetInfoZipPairRDD.mapPartitions(new FlatMapFunction<Iterator<Tuple2<TweetInfo, Long>>, TweetInfo>() {
                         @Override
@@ -229,7 +319,7 @@ public class TopicMain {
 
                     logger.info("tweetJavaRDD compute finish!");
                 }else {
-                    tweetJavaRDD = oldTweetJavaRDD;
+                    tweetJavaRDD = AllTweetJavaRDD;
                 }
 
                 //tweetJavaRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());

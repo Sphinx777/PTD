@@ -31,7 +31,7 @@ public class NMF implements Serializable {
 
 	public NMF(DenseVecMatrix matV, boolean isUpdateW, JavaSparkContext paraSparkContext , int paraNumFactors , int paraNumIters , long numRows , long numCols) {
 		V = matV;
-        V.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
+        //V.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 		boolUpdateW = isUpdateW;
 		minKLDivergence = java.lang.Double.MAX_VALUE;
 		//initialize to zero or other method
@@ -233,6 +233,7 @@ public class NMF implements Serializable {
 //			//compute KL Divergence
 //			double tmpKLDivergence = MeasureUtil.getKLDivergence(vBkMat,wBkMat,hBkMat,sparkSession);
             doubleAccumulator.reset();
+			logger.info("Start to compute KLDivergence");
             double tmpKLDivergence = MeasureUtil.getKLDivergence(V, newW, newH ,doubleAccumulator);
             logger.info("getKLDivergence: "+tmpKLDivergence);
             System.out.println("getKLDivergence: "+tmpKLDivergence);
@@ -267,8 +268,10 @@ public class NMF implements Serializable {
 			}
 			originalH = newH;
             originalW = newW;
+			logger.info("assign the new H , new W finish");
 		}
-		V.rows().unpersist(true);
+		//V.rows().unpersist(true);
+		logger.info("finish the NMF");
 	}
 
 	public DenseVecMatrix getW() {

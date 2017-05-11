@@ -238,7 +238,7 @@ public class TFIDF implements Serializable{
         //CoordinateMatrix coordinateMatrix = new CoordinateMatrix(entryJavaRDD.rdd());
 		//tfidfDVM = coordinateMatrix.toDenseVecMatrix();
 		tfidfDVM = new DenseVecMatrix(entryJavaRDD.rdd());
-		System.out.println("tfidfDVM mem size:"+SizeEstimator.estimate(tfidfDVM));
+		System.out.println("tfidfDVM size:"+tfidfDVM.numRows()+","+tfidfDVM.numCols());
 	}
 	//x:tweet Id , y:term id(features--vector) , value:tfidf(features--vector)
 	public DenseVecMatrix getTfidfDVM(){
