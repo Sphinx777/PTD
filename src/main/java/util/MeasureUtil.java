@@ -134,9 +134,10 @@ public class MeasureUtil {
             public Tuple2<Object,DenseVector<Object>> call(Tuple2<Object, DenseVector<Object>> objectDenseVectorTuple2) throws Exception {
                 double [] doubles = new double[objectDenseVectorTuple2._2().size()];
                 ObjectArrayList<Double> arrayList = new ObjectArrayList<Double>();
+                ObjectArrayList<Object> objects;
 
                 for (int i=0;i<objectDenseVectorTuple2._2().size();i++){
-                    ObjectArrayList<Object> objects = new ObjectArrayList<Object>();
+                    objects = new ObjectArrayList<Object>();
                     Collections.addAll(objects,objectDenseVectorTuple2._2().data());
                     arrayList.add(Double.valueOf(Math.log(((double[])objects.get(0))[i])).doubleValue());
                 }
@@ -166,6 +167,7 @@ public class MeasureUtil {
         Object2IntOpenHashMap<String> wordCntMap2= new Object2IntOpenHashMap<String>();
         LongAccumulator wjAccumulator = sparkSession.sparkContext().longAccumulator();
         LongAccumulator hashKeyAccumulator = sparkSession.sparkContext().longAccumulator();
+        TweetInfo tmpTweetInfo;
 
         //topic word array:total topic word , reference:the tfidf corpus
         //hashMap key rule:alphabetical
@@ -214,7 +216,7 @@ public class MeasureUtil {
                     //tweetInfo list version
                     Iterator<TweetInfo> tweetInfoIterator = tweetInfoList.iterator();
                     while (tweetInfoIterator.hasNext()){
-                        TweetInfo tmpTweetInfo = tweetInfoIterator.next();
+                        tmpTweetInfo = tweetInfoIterator.next();
                         foundSameWordFunc(tmpTweetInfo.getTweet(),topicWordArray[i],topicWordArray[j],wjAccumulator,hashKeyAccumulator,isWjCounted,isWiWjCounted);
                     }
                     if(wjAccumulator.value() > 0) {

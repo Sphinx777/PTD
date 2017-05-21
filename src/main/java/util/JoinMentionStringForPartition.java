@@ -33,11 +33,20 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 
 	public Iterator<Tuple2<Object, DenseVector<Object>>> call(Iterator<TweetInfo> tweetInfoIterator) throws Exception{
 		List<Tuple2<Object, DenseVector<Object>>> denseVecList = new ArrayList<>();
+		TweetInfo tweetData,tweetInfo;
+		String splitStrings,tmpString;
+		String[] arr1,arr2,arr3,arr4;
+		double dbValue,dbCosValue;
+		KShingling ks;
+		StringProfile pro1,pro2;
+		double[] doubles;
+		DenseVector<Object> denseVector;
+        Long2DoubleArrayMap treeMap;
+
 		while(tweetInfoIterator.hasNext()){
-			TweetInfo tweetData = tweetInfoIterator.next();
-			final String splitStrings = tweetData.getUserName();
-			String tmpString;
-			Long2DoubleArrayMap treeMap = new Long2DoubleArrayMap();
+			tweetData = tweetInfoIterator.next();
+			splitStrings = tweetData.getUserName();
+			treeMap = new Long2DoubleArrayMap();
 
 			//compute mention people
 			//old
@@ -45,7 +54,7 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 			//logger.info("collectAccumulator length:"+collectionAccumulator.value().size());
             System.out.println("tweetInfo size:"+tweetInfos.size());
             for (int i = (int) tweetData.getTweetId() + 1; i < tweetInfos.size(); i++) {
-				TweetInfo tweetInfo = tweetInfos.get(i);
+				tweetInfo = tweetInfos.get(i);
 				//for(TweetInfo tweetInfo:tweetInfos){
 				//old
 				//tmpString = row.getAs("userName").toString();
@@ -55,9 +64,9 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 					//old
 					//String[] arr1= row.getAs("mentionMen").toString().split(",");
 					//logger.info("compute mention men start");
-					String[] arr1 = tweetInfo.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
-					String[] arr2 = tweetData.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
-					double dbValue = (double) TopicUtil.computeArrayIntersection(arr1, arr2) / TopicUtil.computeArrayUnion(arr1, arr2);
+					arr1 = tweetInfo.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
+					arr2 = tweetData.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
+					dbValue = (double) TopicUtil.computeArrayIntersection(arr1, arr2) / TopicUtil.computeArrayUnion(arr1, arr2);
 					//logger.info("compute mention men finish");
 					//if(dbValue > 0){
 					//System.out.println();
@@ -68,8 +77,8 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 					//String[] arr3= row.getAs("userInteraction").toString().split(",");
 					//new
 					//logger.info("compute user interaction start");
-					String[] arr3 = tweetInfo.getUserInteraction().split(TopicConstant.COMMA_DELIMITER);
-					String[] arr4 = tweetData.getUserInteraction().split(TopicConstant.COMMA_DELIMITER);
+					arr3 = tweetInfo.getUserInteraction().split(TopicConstant.COMMA_DELIMITER);
+					arr4 = tweetData.getUserInteraction().split(TopicConstant.COMMA_DELIMITER);
 					int intValue = TopicUtil.computeArrayIntersection(arr3, arr4);
 					if (intValue > 0) {
 						dbValue += 1;
@@ -80,12 +89,12 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 
 					//compute cosine similarity min sentence size
 					//logger.info("compute cosine similarity start");
-					KShingling ks = new KShingling(2);
-					StringProfile pro1 = ks.getProfile(tweetData.getTweet());
+					ks = new KShingling(2);
+					pro1 = ks.getProfile(tweetData.getTweet());
 					//old
 					//StringProfile pro2 = ks.getProfile(row.getAs("tweet").toString());
-					StringProfile pro2 = ks.getProfile(tweetInfo.getTweet());
-					double dbCosValue = pro1.cosineSimilarity(pro2);
+					pro2 = ks.getProfile(tweetInfo.getTweet());
+					dbCosValue = pro1.cosineSimilarity(pro2);
 					dbValue += dbCosValue;
 					//logger.info("compute cosine similarity finish");
 
@@ -114,13 +123,13 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
             //logger.info("current compute mention tweet id:" + tweetData.getTweetId());
             System.out.println("current compute mention tweet id:" + tweetData.getTweetId());
 
-			double[] doubles = new double[tweetInfos.size()];
+			doubles = new double[tweetInfos.size()];
 
 			//double[] doubles = Arrays.copyOf(treeMap.values().toDoubleArray(),tweetInfos.size());
 
 			System.arraycopy(treeMap.values().toDoubleArray(), 0, doubles, (int) tweetData.getTweetId() + 1, treeMap.size());
 
-			DenseVector<Object> denseVector = new DenseVector<Object>(doubles);
+			denseVector = new DenseVector<Object>(doubles);
 
 			denseVecList.add(new Tuple2<Object, DenseVector<Object>>(Long.valueOf(tweetData.getTweetId()),denseVector));
 		}

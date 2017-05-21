@@ -303,14 +303,16 @@ public class TFIDF implements Serializable{
 			long matrixIdx = 0;
 			ObjectArrayList<Object> tuple2s = new ObjectArrayList<Object>();
 			double[] doubles = new double[tweetWordMapBroadCast.value().size()];
+            Iterator<Map.Entry<String, String>> iter;
+            Map.Entry<String, String> entry;
 			for (int i : vectorLongTuple2._1().toSparse().indices()) {
 				if (tweetWordMapBroadCast.getValue().containsValue(tweetIDMapBroadCast.getValue().get(String.valueOf(i))) == false) {
 					System.out.println("tweetWordMapBroadCast contains no value error!");
 					logger.info("tweetWordMapBroadCast contains no value error!");
 				} else {
-					Iterator<Map.Entry<String, String>> iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
+					iter = tweetWordMapBroadCast.getValue().entrySet().iterator();
 					while (iter.hasNext()) {
-						Map.Entry<String, String> entry = iter.next();
+						entry = iter.next();
 						if (entry.getValue().equals(tweetIDMapBroadCast.getValue().get(String.valueOf(i)))) {
 							matrixIdx = Long.valueOf(entry.getKey());
 							//format matrixIdx+ ";" + doubleValue

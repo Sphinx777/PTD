@@ -129,19 +129,24 @@ public class NMF implements Serializable {
 	public void buildNMFModel(){
 		final ArrayList<Double> tmpKLDivergenceList = new ArrayList<Double>();
 		logger.info("Start to build NMF model:");
+        BlockMatrix wTranMatrix,hTranMatrix;
+        DistributedMatrix wtranv;
+        DenseVecMatrix HUpdateMatrix,hhtran,WUpdateMatrix;
+
+        double tmpKLDivergence;
 		for(int iter=0;iter< numIters;iter++) {
 			logger.info("original W transpose compute:");
-			BlockMatrix wTranMatrix = originalW.transpose();
+			wTranMatrix = originalW.transpose();
 			//wTranMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 			logger.info("original H transpose compute:");
-            BlockMatrix hTranMatrix = originalH.transpose();
+            hTranMatrix = originalH.transpose();
 			//hTranMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
 
             //logger.info("start to compute H--W:"+originalW.numRows()+","+originalW.numCols()+";H:"+originalH.numRows()+","+originalH.numCols());
             //System.out.println("start to compute H");
 
 			logger.info("start to compute H update:");
-            DistributedMatrix wtranv =  wTranMatrix.multiply(V, CmdArgs.cores , CmdArgs.numThreshold);
+            wtranv =  wTranMatrix.multiply(V, CmdArgs.cores , CmdArgs.numThreshold);
 
             if(wtranv instanceof BlockMatrix){
                 logger.info("I am block Matrix");
@@ -151,7 +156,7 @@ public class NMF implements Serializable {
             }
 
 
-            DenseVecMatrix HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wtranv,((BlockMatrix)(((BlockMatrix)(wTranMatrix.multiply(originalW,CmdArgs.cores,CmdArgs.numThreshold))).multiply(originalH,CmdArgs.cores,CmdArgs.numThreshold))).toDenseVecMatrix());
+            HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wtranv,((BlockMatrix)(((BlockMatrix)(wTranMatrix.multiply(originalW,CmdArgs.cores,CmdArgs.numThreshold))).multiply(originalH,CmdArgs.cores,CmdArgs.numThreshold))).toDenseVecMatrix());
 		    //HUpdateMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
             logger.info("start to compute new H:");
 			newH = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Multiply, originalH, HUpdateMatrix);
@@ -216,9 +221,9 @@ public class NMF implements Serializable {
 //				});
 //				tmpWUpdate2.rows().toJavaRDD().collect();
                 logger.info("start to compute W update:");
-                DenseVecMatrix hhtran = (DenseVecMatrix) originalH.multiply(hTranMatrix,CmdArgs.numThreshold);
+                hhtran = (DenseVecMatrix) originalH.multiply(hTranMatrix,CmdArgs.numThreshold);
 
-                DenseVecMatrix WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, (DenseVecMatrix) V.multiply(hTranMatrix,CmdArgs.cores),(DenseVecMatrix) originalW.multiply(hhtran,CmdArgs.cores));
+                WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, (DenseVecMatrix) V.multiply(hTranMatrix,CmdArgs.cores),(DenseVecMatrix) originalW.multiply(hhtran,CmdArgs.cores));
                 //WUpdateMatrix.rows().persist(StorageLevel.MEMORY_AND_DISK_SER());
                 logger.info("start to compute new W:");
                 newW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Multiply, originalW,WUpdateMatrix);
@@ -234,7 +239,7 @@ public class NMF implements Serializable {
 //			double tmpKLDivergence = MeasureUtil.getKLDivergence(vBkMat,wBkMat,hBkMat,sparkSession);
             doubleAccumulator.reset();
 			logger.info("Start to compute KLDivergence");
-            double tmpKLDivergence = MeasureUtil.getKLDivergence(V, newW, newH ,doubleAccumulator);
+            tmpKLDivergence = MeasureUtil.getKLDivergence(V, newW, newH ,doubleAccumulator);
             logger.info("getKLDivergence: "+tmpKLDivergence);
             System.out.println("getKLDivergence: "+tmpKLDivergence);
 //			//System.out.println(tmpKLDivergence);

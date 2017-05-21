@@ -270,16 +270,20 @@ public class TopicUtil {
             @Override
             public Iterator<Tuple2<Object, DenseVector<Object>>> call(Iterator<Tuple2<Object, ObjectArrayList<Object>>> tuple2Iterator) throws Exception {
                 ObjectArrayList<Tuple2<Object, DenseVector<Object>>> tuple2ObjectArrayList = new ObjectArrayList<Tuple2<Object, DenseVector<Object>>>();
+                Tuple2<Object, ObjectArrayList<Object>> v1;
+                double[] doubles;
+                List<double[]> list;
+                DenseVector<Object> denseVector;
 
                 while (tuple2Iterator.hasNext()) {
-                    Tuple2<Object, ObjectArrayList<Object>> v1 = tuple2Iterator.next();
+                    v1 = tuple2Iterator.next();
                     logger.info("resultRDD2 RDD computing:" + v1._1());
-                    double[] doubles = new double[v1._2().size()];
+                    doubles = new double[v1._2().size()];
                     for (int i = 0; i < doubles.length; i++) {
                         doubles[i] = Double.valueOf((Double) v1._2().toArray()[i]).doubleValue();
                     }
-                    List<double[]> list = Arrays.asList(doubles);
-                    DenseVector<Object> denseVector = new DenseVector<Object>(list.toArray()[0]);
+                    list = Arrays.asList(doubles);
+                    denseVector = new DenseVector<Object>(list.toArray()[0]);
                     tuple2ObjectArrayList.add(new Tuple2<Object, DenseVector<Object>>(v1._1(), denseVector));
                 }
 

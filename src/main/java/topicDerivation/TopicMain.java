@@ -78,9 +78,9 @@ public class TopicMain {
                         //.master("local")
                         .appName("TopicDerivation")
                         .config("spark.sql.warehouse.dir", "file:///")
-                        .config("spark.serializer","org.apache.spark.serializer.KryoSerializer")
-                        .config("spark.kryo.registrator",TweetInfoKryoRegister.class.getName())
-                        .config("spark.kryoserializer.buffer.max","2000m")
+                        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+                        .config("spark.kryo.registrator", TweetInfoKryoRegister.class.getName())
+                        .config("spark.kryoserializer.buffer.max", "2000m")
                         .getOrCreate();
 
                 JavaSparkContext sc = new JavaSparkContext(sparkSession.sparkContext());
@@ -116,23 +116,23 @@ public class TopicMain {
                 //Dataset<Row> csvDataset = sparkSession.read().schema(schema).csv(cmdArgs.inputFilePath);
 
                 //write parameter
-                TopicUtil.writeParameter(outFilePath,sc.hadoopConfiguration());
+                TopicUtil.writeParameter(outFilePath, sc.hadoopConfiguration());
 
                 //drop the no use column
-               // Dataset<Row> currDataset = csvDataset.drop("polarity", "noUse");
+                // Dataset<Row> currDataset = csvDataset.drop("polarity", "noUse");
 
                 logger.info("compute the mentionMen!");
                 System.out.println("compute the mentionMen!");
 
 
                 //single file version
-                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath,5000);
+                JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath, 5000);
 
                 //set custom javaRDD and compute the mentionMen
                 JavaRDD<TweetInfo> AllTweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
                     @Override
                     public TweetInfo call(String v1) throws Exception {
-                        String[] splitStrings = v1.replaceAll(TopicConstant.DOUBLE_QUOTE_DELIMITER,"").split(TopicConstant.COMMA_DELIMITER);
+                        String[] splitStrings = v1.replaceAll(TopicConstant.DOUBLE_QUOTE_DELIMITER, "").split(TopicConstant.COMMA_DELIMITER);
                         TweetInfo tweet = new TweetInfo();
                         //tweet.setTweetId(tweetIDAccumulator.value());
                         //logger.info("tweetIDAccumulator.value():"+tweetIDAccumulator.value());
@@ -140,9 +140,9 @@ public class TopicMain {
 
                         tweet.setDateString(splitStrings[2]);
                         tweet.setUserName(splitStrings[4]);
-                        tweet.setTweet(splitStrings[5].replaceAll("(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]",""));
-                        System.out.println("tweet:"+tweet.getTweet());
-                        logger.info("tweet:"+tweet.getTweet());
+                        tweet.setTweet(splitStrings[5].replaceAll("(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]", ""));
+                        System.out.println("tweet:" + tweet.getTweet());
+                        logger.info("tweet:" + tweet.getTweet());
                         tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
                         tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
                         return tweet;
@@ -298,17 +298,27 @@ public class TopicMain {
 //                    }
 //                });
 
+                //if(!cmdArgs.model.equals("coherence")) {
+                JavaRDD<TweetInfo> oldTweetJavaRDD;
+                if (cmdArgs.numSample != 0) {
+                    logger.info("sampling:" + cmdArgs.numSample);
+                    oldTweetJavaRDD = sc.parallelize(AllTweetJavaRDD.takeSample(false, cmdArgs.numSample), cmdArgs.numSample);
+                } else {
+                    oldTweetJavaRDD = AllTweetJavaRDD;
+                }
+
                 JavaRDD<TweetInfo> tweetJavaRDD;
                 if(!cmdArgs.model.equals("coherence")) {
-                    JavaPairRDD<TweetInfo, Long> tweetInfoZipPairRDD = AllTweetJavaRDD.zipWithIndex();
-
+                    JavaPairRDD<TweetInfo, Long> tweetInfoZipPairRDD = oldTweetJavaRDD.zipWithIndex();
                     tweetJavaRDD = tweetInfoZipPairRDD.mapPartitions(new FlatMapFunction<Iterator<Tuple2<TweetInfo, Long>>, TweetInfo>() {
                         @Override
                         public Iterator<TweetInfo> call(Iterator<Tuple2<TweetInfo, Long>> tuple2Iterator) throws Exception {
                             ArrayList<TweetInfo> tweetInfoArrayList = new ArrayList<TweetInfo>();
+                            Tuple2<TweetInfo, Long> tuple2;
+                            TweetInfo tweetInfo;
                             while (tuple2Iterator.hasNext()) {
-                                Tuple2<TweetInfo, Long> tuple2 = tuple2Iterator.next();
-                                TweetInfo tweetInfo = tuple2._1();
+                                tuple2 = tuple2Iterator.next();
+                                tweetInfo = tuple2._1();
                                 tweetInfo.setTweetId(tuple2._2().longValue());
                                 tweetInfoArrayList.add(tweetInfo);
                             }
@@ -316,10 +326,9 @@ public class TopicMain {
                             return tweetInfoArrayList.iterator();
                         }
                     });
-
                     logger.info("tweetJavaRDD compute finish!");
-                }else {
-                    tweetJavaRDD = AllTweetJavaRDD;
+                }else{
+                    tweetJavaRDD = oldTweetJavaRDD;
                 }
 
                 //tweetJavaRDD.persist(StorageLevel.MEMORY_AND_DISK_SER());

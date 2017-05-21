@@ -32,4 +32,7 @@ public class CmdArgs {
 
     @Option(name="-threshold",usage="Sets a number of threshold")
     public static int numThreshold = 3000;
+
+    @Option(name="-sample",usage="Sets a number of threshold")
+    public static int numSample = 0;
 }
