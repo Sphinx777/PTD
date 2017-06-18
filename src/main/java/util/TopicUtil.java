@@ -319,15 +319,33 @@ public class TopicUtil {
         }
 
         Date dateTimeLeast = dateTime1.after(dateTime2) ? dateTime1 : dateTime2;
-        double dbWeighted = 1;
+        double dbWeighted = 0;
         long diffT1T2 = Math.abs(dateTime1.getTime() - dateTime2.getTime());
-        long diffT1T2InDays = (long) (diffT1T2 / (24 * 60 * 60 * 1000));
         long diffTnowLeast = currDate.getTime() - dateTimeLeast.getTime();
-        long diffTnowLeastInDays = (long) (diffTnowLeast / (24 * 60 * 60 * 1000));
+
+
+        long diffT1T2InDays = (long) (diffT1T2 / TopicConstant.DAY_IN_MILLISECONDS);
+        long diffTnowLeastInDays = (long) (diffTnowLeast / TopicConstant.DAY_IN_MILLISECONDS);
+        //by day
         if (diffT1T2InDays != 0 || diffTnowLeastInDays != 0) {
-            dbWeighted = 1 + (1.0 / (diffT1T2InDays + diffTnowLeastInDays));
+            dbWeighted = 1.0 / (diffT1T2InDays + diffTnowLeastInDays);
+
+            //by month
+            if(dbWeighted < 1){
+                dbWeighted = 1 / ((diffT1T2+diffTnowLeast)/TopicConstant.MONTH_IN_MILLISECONDS);
+
+                //by year
+                if(dbWeighted < 1){
+                    dbWeighted = 1 / ((diffT1T2+diffTnowLeast)/TopicConstant.YEAR_IN_MILLISECONDS);
+
+                    //by decade
+                    if(dbWeighted < 1) {
+                        dbWeighted = 1 / ((diffT1T2 + diffTnowLeast) / TopicConstant.DECADE_IN_MILLISECONDS);
+                    }
+                }
+            }
         }
-        return dbWeighted;
+        return 1+dbWeighted;
     }
 
     public static JavaRDD<TweetInfo> preProcessTweetRDD(Dataset<TweetInfo> tweetInfoDataset){
