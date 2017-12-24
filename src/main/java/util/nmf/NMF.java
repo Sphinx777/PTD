@@ -7,7 +7,6 @@ import edu.nju.pasalab.marlin.utils.MTUtils;
 import edu.nju.pasalab.marlin.utils.UniformGenerator;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.SizeEstimator;
 import util.CmdArgs;
@@ -20,14 +19,17 @@ import java.util.ArrayList;
 
 public class NMF implements Serializable {
 	private double initialNum = 0.01;
-	private DenseVecMatrix V , originalW, originalH, minW , minH , newW, newH;
+	private DenseVecMatrix V , originalW, originalH, minW , minH , newW, newH , minY, newY , originalY;
     static double minKLDivergence = java.lang.Double.MAX_VALUE;
 	private boolean boolUpdateW;
     private JavaSparkContext javaSparkContext;
-    private int numFactors;
-	private int numIters;
+    private int numFactors , numIters;
+	private long numRowsOfV;
     private DoubleAccumulator doubleAccumulator;
     static Logger logger = Logger.getLogger(NMF.class.getName());
+
+	//for tNMijF use
+	public DenseVecMatrix A;
 
 	public NMF(DenseVecMatrix matV, boolean isUpdateW, JavaSparkContext paraSparkContext , int paraNumFactors , int paraNumIters , long numRows , long numCols) {
 		V = matV;
@@ -50,6 +52,7 @@ public class NMF implements Serializable {
 
         logger.info("set dummy factor row!");
         System.out.println("set dummy factor row!");
+		numRowsOfV = numRows;
         //dummy factor row
 		//old
 //		for (int i = 0; i< numFactors; i++){
@@ -125,8 +128,136 @@ public class NMF implements Serializable {
         System.out.println("NMF initial function finish");
     }
 
+    //tNMijF
+    public void buildNMFModel_tNMijF(){
+		final ArrayList<Double> tmpKLDivergenceList = new ArrayList<Double>();
+		BlockMatrix wTranMatrix,yTranMatrix;
+		DistributedMatrix wtranwMatrix,wtranVMatrix,wtranAmatrix;
+		DenseVecMatrix HUpdateMatrix,WUpdateMatrix,YUpdateMatrix ,yytran;
+		double tmpKLDivergence_A , tmpKLDivergence_V , sumOfDivergence;
+
+		logger.info("build the tNMijF NMF model and initialize Y");
+		System.out.println("build the tNMijF NMF model and initialize Y");
+
+		originalY = MTUtils.randomDenVecMatrix(javaSparkContext.sc(),numFactors,Long.valueOf(numRowsOfV).intValue(),0,new UniformGenerator(0.0, 1.0));
+		minY = originalY;
+
+		logger.info("tNNijF initial finish");
+		System.out.println("tNMijF initial finish");
+
+		for(int iter=0;iter< numIters ; iter++){
+			logger.info("Start to tNMijF iteration");
+			System.out.println("Start to tNMijF iteration");
+			//wtran
+			logger.info("original W transpose compute!");
+			System.out.println("original W transpose compute!");
+			wTranMatrix = originalW.transpose();
+
+			//ytran
+			logger.info("original Y transpose compute!");
+			System.out.println("original Y transpose compute!");
+			yTranMatrix = originalY.transpose();
+
+
+			logger.info("Start to compute Wupdate matrix");
+			System.out.println("Start to compute Wupdate matrix");
+
+			yytran = (DenseVecMatrix) originalY.multiply(yTranMatrix,CmdArgs.numThreshold);
+			//W update matrix = (D)A * (B)ytran / (D?)wyMatrix * (B)ytran
+			WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, (DenseVecMatrix)A.multiply(yTranMatrix,CmdArgs.cores),(DenseVecMatrix)originalW.multiply(yytran,CmdArgs.cores));
+			//WUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, (DenseVecMatrix) V.multiply(hTranMatrix,CmdArgs.cores),(DenseVecMatrix) originalW.multiply(hhtran,CmdArgs.cores));
+
+
+			logger.info("start to compute new W:");
+			newW = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Multiply, originalW, WUpdateMatrix);
+			logger.info("compute W finish");
+			System.out.println("compute W finish");
+
+			//wtranAMatrix
+			logger.info("compute wtranA matrix!");
+			System.out.println("compute wtranA matrix!");
+			wtranAmatrix = originalW.transpose().multiply(A,CmdArgs.cores,CmdArgs.numThreshold);
+			if(wtranAmatrix instanceof BlockMatrix){
+				logger.info("wtranAmatrix is block Matrix");
+				System.out.println("wtranAmatrix is block Matrix");
+				wtranAmatrix = ((BlockMatrix)wtranAmatrix).toDenseVecMatrix();
+			}else if(wtranAmatrix instanceof DenseVecMatrix){
+				logger.info("wtranAmatrix is DenseVecMatrix");
+				System.out.println("wtranAmatrix is DenseVecMatrix");
+			}
+
+			//Y update matrix = (B)wtran * (D)A / (B)wtran * (D?)wyMatrix
+			YUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, (DenseVecMatrix) wtranAmatrix, ((BlockMatrix)(((BlockMatrix)(wTranMatrix.multiply(originalW,CmdArgs.cores,CmdArgs.numThreshold))).multiply(originalY,CmdArgs.cores,CmdArgs.numThreshold))).toDenseVecMatrix());
+//			TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wtranv,((BlockMatrix)(((BlockMatrix)(wTranMatrix.multiply(originalW,CmdArgs.cores,CmdArgs.numThreshold))).multiply(originalH,CmdArgs.cores,CmdArgs.numThreshold))).toDenseVecMatrix());
+
+			logger.info("start to compute new Y:");
+			newY = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Multiply, originalY, YUpdateMatrix);
+			logger.info("compute Y finish");
+			System.out.println("compute Y finish");
+
+			//wtranVMatrix
+			logger.info("compute wtranV matrix!");
+			System.out.println("compute wtranV matrix!");
+			wtranVMatrix = originalW.transpose().multiply(V,CmdArgs.cores,CmdArgs.numThreshold);
+			if(wtranVMatrix instanceof BlockMatrix){
+				logger.info("wtranVMatrix is block Matrix");
+				System.out.println("wtranVMatrix is block Matrix");
+				wtranVMatrix = ((BlockMatrix)wtranVMatrix).toDenseVecMatrix();
+			}else if(wtranVMatrix instanceof DenseVecMatrix){
+				logger.info("wtranVMatrix is DenseVecMatrix");
+				System.out.println("wtranVMatrix is DenseVecMatrix");
+			}
+
+			//H update matrix = (B)wtran * (D)V / (B)wtran * (D?)whMatrix
+			HUpdateMatrix = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide, (DenseVecMatrix) wtranVMatrix,((BlockMatrix)(((BlockMatrix)(wTranMatrix.multiply(originalW,CmdArgs.cores,CmdArgs.numThreshold))).multiply(originalH,CmdArgs.cores,CmdArgs.numThreshold))).toDenseVecMatrix());
+			//TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Divide,(DenseVecMatrix) wtranv,((BlockMatrix)(((BlockMatrix)(wTranMatrix.multiply(originalW,CmdArgs.cores,CmdArgs.numThreshold))).multiply(originalH,CmdArgs.cores,CmdArgs.numThreshold))).toDenseVecMatrix());
+
+			logger.info("start to compute new H:");
+			newH = TopicUtil.getCoorMatOption(TopicConstant.MatrixOperation.Multiply, originalH, HUpdateMatrix);
+			logger.info("compute H finish");
+			System.out.println("compute H finish");
+
+
+			//compute D(A||WY)
+			doubleAccumulator.reset();
+			logger.info("Start to compute D(A||WY) KLDivergence");
+			tmpKLDivergence_A = MeasureUtil.getKLDivergence(A, newW, newY ,doubleAccumulator);
+			logger.info("D(A||WY) getKLDivergence: "+tmpKLDivergence_A);
+			System.out.println("D(A||WY) getKLDivergence: "+tmpKLDivergence_A);
+			//tmpKLDivergenceList.add(tmpKLDivergence);
+
+			//compute D(V||WH)
+			doubleAccumulator.reset();
+			logger.info("Start to compute D(V||WH) KLDivergence");
+			tmpKLDivergence_V = MeasureUtil.getKLDivergence(V, newW, newH ,doubleAccumulator);
+			logger.info("D(V||WH) getKLDivergence: "+tmpKLDivergence_V);
+			System.out.println("D(V||WH) getKLDivergence: "+tmpKLDivergence_V);
+
+			//sum D value and record
+			sumOfDivergence = tmpKLDivergence_A + tmpKLDivergence_V;
+			logger.info("sum of KLDivergence:"+sumOfDivergence);
+			System.out.println("sum of KLDivergence:"+sumOfDivergence);
+
+			//compare minimal Divergence
+			if(sumOfDivergence<minKLDivergence) {
+				logger.info("minKLDivergence:" + minKLDivergence);
+				System.out.println("minKLDivergence:" + minKLDivergence);
+				minKLDivergence = sumOfDivergence;
+
+				minW = newW;
+				minH = newH;
+				minY = newY;
+			}
+			originalH = newH;
+			originalW = newW;
+			originalY = newY;
+			logger.info("assign the new H , new W, new Y finish");
+		}
+		logger.info("finish the NMF");
+	}
+
 	//update originalW,originalH
-	public void buildNMFModel(){
+	public void buildNMFModel_intJNMF_Related(){
 		final ArrayList<Double> tmpKLDivergenceList = new ArrayList<Double>();
 		logger.info("Start to build NMF model:");
         BlockMatrix wTranMatrix,hTranMatrix;

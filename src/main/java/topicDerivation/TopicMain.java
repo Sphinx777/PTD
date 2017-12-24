@@ -4,8 +4,6 @@ import breeze.linalg.DenseVector;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import edu.nju.pasalab.marlin.matrix.DenseVecMatrix;
-import edu.nju.pasalab.marlin.utils.MTUtils;
-import edu.nju.pasalab.marlin.utils.UniformGenerator;
 import it.unimi.dsi.fastutil.ints.Int2DoubleLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -24,7 +22,6 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.CollectionAccumulator;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
@@ -128,6 +125,18 @@ public class TopicMain {
                 //single file version
                 JavaRDD<String> stringJavaRDD = sc.textFile(cmdArgs.inputFilePath, 5000);
 
+                //user count non-duplicate
+                Broadcast<HashSet<String>> brUserList = sc.broadcast(new HashSet<String>());
+
+                //mention count
+                LongAccumulator mentionAccumulator = sc.sc().longAccumulator();
+
+                //reply count
+                LongAccumulator replyAccumulator = sc.sc().longAccumulator();
+
+                //reTweet
+                LongAccumulator reTweetAccumulator = sc.sc().longAccumulator();
+
                 //set custom javaRDD and compute the mentionMen
                 JavaRDD<TweetInfo> AllTweetJavaRDD = stringJavaRDD.map(new Function<String, TweetInfo>() {
                     @Override
@@ -145,18 +154,38 @@ public class TopicMain {
                         logger.info("tweet:" + tweet.getTweet());
                         tweet.setMentionMen(setMentionMen(tweet.getUserName(), tweet.getTweet()));
                         tweet.setUserInteraction(setUserInteraction(tweet.getUserName(), tweet.getTweet()));
+
                         return tweet;
                     }
 
                     //for po:interaction based on people
                     private String setMentionMen(String userName, String tweet) {
+                        boolean isMentioned = false;
                         ArrayList<String> arr = new ArrayList<String>();
                         arr.add(userName.trim());
                         String[] strings = tweet.split("\\s+");
                         for (String str : strings) {
                             if (str.indexOf("@") != -1) {
                                 arr.add(str.trim().replace("@", ""));
+                                //check isMentioned
+                                isMentioned = true;
                             }
+                        }
+                        /*for(int i=0;i<strings.length;i++){
+                            if(i!=0 && !strings[i-1].equals("RT") && strings[i].indexOf("@") != -1){
+                                arr.add(strings[i].trim().replace("@", ""));
+                                //check isMentioned
+                                isMentioned = true;
+                            }
+                        }*/
+//                        if(strings[strings.length-1].indexOf("@")!=-1){
+//                            isMentioned = true;
+//                            arr.add(strings[strings.length-1].trim().replace("@", ""));
+//                        }
+
+                        //if isMentioned count mention
+                        if(isMentioned){
+                            mentionAccumulator.add(1);
                         }
                         return String.join(TopicConstant.COMMA_DELIMITER, arr);
                     }
@@ -171,8 +200,12 @@ public class TopicMain {
                         if (strings.length > 0) {
                             if (strings[0].indexOf("@") != -1 && strings[0].length() > 1) {
                                 returnStr += TopicConstant.COMMA_DELIMITER + strings[0].replace("@", "");
+                                //count reply
+                                replyAccumulator.add(1);
                             } else if (strings[0].equals("RT") && strings.length > 1) {
                                 returnStr += TopicConstant.COMMA_DELIMITER + strings[1].replace(":", "").replace("@", "");
+                                //count retweet
+                                reTweetAccumulator.add(1);
                             }
                         }
                         return returnStr;
@@ -345,13 +378,22 @@ public class TopicMain {
                     public void call(TweetInfo tweetInfo) throws Exception {
                         tweetInfoAccumulator.add(tweetInfo);
                         tweetIDAccumulator.add(1);
+                        //check user count
+                        brUserList.getValue().add(tweetInfo.getUserName());
                     }
                 });
 
-                logger.info("tweetInfoAccumulator size:"+tweetInfoAccumulator.value().size());
-                System.out.println("tweetInfoAccumulator mem size:"+SizeEstimator.estimate(tweetInfoAccumulator));
+                //show the tweet statistics
+                logger.info("tweet total count:"+tweetIDAccumulator.count());
+                logger.info("user count(non-duplicate):"+brUserList.getValue().size());
+                logger.info("mention:"+mentionAccumulator.count()/2);
+                logger.info("reply:"+replyAccumulator.count()/2);
+                logger.info("retweet:"+reTweetAccumulator.count()/2);
 
-                System.out.println("ds mem size:"+SizeEstimator.estimate(ds));
+//                logger.info("tweetInfoAccumulator size:"+tweetInfoAccumulator.value().size());
+//                System.out.println("tweetInfoAccumulator mem size:"+SizeEstimator.estimate(tweetInfoAccumulator));
+
+//                System.out.println("ds mem size:"+SizeEstimator.estimate(ds));
                 //ds.persist(StorageLevel.MEMORY_AND_DISK_SER());
 
                 //transform to word vector
@@ -367,11 +409,10 @@ public class TopicMain {
                 }
 
                 //compute topic word list
-                if (!cmdArgs.model.equals("coherence")) {
-                    logger.info("compute coherence start!");
-                    System.out.println("compute coherence start!");
-
-                    //DTTD , intJNMF...etc
+                if (cmdArgs.model.equals("PTD")||cmdArgs.model.equals("intJNMF")) {
+                    logger.info("Now compute interaction model:"+cmdArgs.model);
+                    System.out.println("Now compute interaction model:"+cmdArgs.model);
+                    //PTD , intJNMF...etc
                     //ds.show();
 
                     //old
@@ -449,9 +490,10 @@ public class TopicMain {
 
                     logger.info("build NMF model!");
                     System.out.println("build NMF model!");
-                    interactionNMF.buildNMFModel();
+                    interactionNMF.buildNMFModel_intJNMF_Related();
                     DenseVecMatrix W = interactionNMF.getW();
                     //poRDD.unpersist();
+
 
                     Dataset<Row> tfidfDataset = ds.select("tweetId", "tweet");
                     System.out.println("tfidfDataset mem size:"+SizeEstimator.estimate(tfidfDataset));
@@ -482,7 +524,7 @@ public class TopicMain {
 
                     logger.info("build tfidf NMF model!");
                     System.out.println("build tfidf NMF model!");
-                    tfidfNMF.buildNMFModel();
+                    tfidfNMF.buildNMFModel_intJNMF_Related();
                     //CoordinateMatrix W1 = tfidfNMF.getOriginalW();
                     DenseVecMatrix H1 = tfidfNMF.getH();
                     //sentenceData.unpersist();
@@ -581,7 +623,92 @@ public class TopicMain {
                     //cmpRDD.foreach(new GetTopTopicWord(tfidf.getTweetIDMap(),cmdArgs.numTopWords,topicWordAccumulator));
 
                     topicWordList = new ObjectArrayList<String[]>(topicWordAccumulator.value());
-                } else {
+                }else if(cmdArgs.model.equals("tNMijF")){
+                    //model = tNMijF
+                    logger.info("Now compute the tNMijF~~~");
+                    System.out.println("Now compute the tNMijF~~~");
+
+                    logger.info("compute the interaction between tweets in tNMijF");
+                    System.out.println("compute the interaction between tweets in tNMijF");
+                    JavaRDD<Tuple2<Object,DenseVector<Object>>> tuple2JavaRDD = tweetJavaRDD.mapPartitions(new JoinMentionStringForPartition(new ObjectArrayList<TweetInfo>(tweetInfoAccumulator.value()),(Date) broadcastCurrDate.getValue() , cmdArgs.model));
+
+                    logger.info("create the tweet-interaction matrix");
+                    System.out.println("create the tweet-interaction matrix");
+                    DenseVecMatrix tweetDVM = new DenseVecMatrix(tuple2JavaRDD.rdd());
+
+
+                    logger.info("Start to compute the tfidf");
+                    System.out.println("Start to compute the tfidf");
+                    Dataset<Row> tfidfDataset = ds.select("tweetId", "tweet");
+                    Dataset<Row> sentenceData = sparkSession.createDataFrame(tfidfDataset.toJavaRDD(), schemaTFIDF);
+
+                    CollectionAccumulator<String> stringAccumulator = sc.sc().collectionAccumulator();
+                    TFIDF tfidf = new TFIDF(sentenceData,sc, stringAccumulator);
+
+                    logger.info("Start to compute the tfidf model");
+                    System.out.println("Start to compute the tfidf model");
+                    tfidf.buildModel();
+
+                    logger.info("tNMijF Initialize");
+                    System.out.println("tNMijF Initialize");
+                    //NMF interactionNMF = new NMF(tweetDVM, true, sc , cmdArgs.numFactors , cmdArgs.numIters , tweetIDAccumulator.value(),tweetIDAccumulator.value());
+                    NMF NMijF_NMF = new NMF(tfidf.getTfidfDVM(),true, sc, cmdArgs.numFactors , cmdArgs.numIters,tweetIDAccumulator.value(), tfidf.getTweetIDMap().size());
+                    NMijF_NMF.A = tweetDVM;
+
+                    logger.info("build tNMijF_NMF model!");
+                    System.out.println("build tNMijF_NMF model!");
+                    NMijF_NMF.buildNMFModel_tNMijF();
+
+                    DenseVecMatrix H = NMijF_NMF.getH();
+
+                    logger.info("order tNMijF score!");
+                    System.out.println("order tNMijF score!");
+                    JavaRDD<Int2DoubleLinkedOpenHashMap> cmpRDD = H.rows().toJavaRDD().map(new Function<Tuple2<Object, DenseVector<Object>>, Int2DoubleLinkedOpenHashMap>() {
+                        @Override
+                        public Int2DoubleLinkedOpenHashMap call(Tuple2<Object, DenseVector<Object>> srcTuple) throws Exception {
+                            ArrayList<Object> tmpList = new ArrayList<Object>();
+                            Collections.addAll(tmpList,srcTuple._2().data());
+                            double[] tmpDBArray = (double[])tmpList.get(0);
+                            HashMap<Integer,Double> resultMap = new HashMap<Integer, Double>();
+                            for(int i =0;i < tmpDBArray.length;i++){
+                                if(tmpDBArray[i] > 0){
+                                    resultMap.put(i, tmpDBArray[i]);
+                                }
+                            }
+
+                            List<Map.Entry<Integer,Double>> list = new LinkedList<Map.Entry<Integer, Double>>(resultMap.entrySet());
+                            Collections.sort(list, new Comparator<Map.Entry<Integer, Double>>() {
+                                @Override
+                                public int compare(Map.Entry<Integer, Double> o1, Map.Entry<Integer, Double> o2) {
+                                    return (o2.getValue()).compareTo(o1.getValue());
+                                }
+                            });
+
+                            Int2DoubleLinkedOpenHashMap result = new Int2DoubleLinkedOpenHashMap();
+                            for(Map.Entry<Integer,Double> entry:list){
+                                //System.out.println("order NMF:"+entry.getKey()+"--"+entry.getValue());
+                                //logger.info("order NMF:"+entry.getKey()+"--"+entry.getValue());
+                                result.put(entry.getKey(), entry.getValue());
+                            }
+                            return result;
+                        }
+                    });
+
+                    logger.info("transform to JSON!");
+                    System.out.println("transform to JSON!");
+                    CollectionAccumulator<String[]> topicWordAccumulator = sc.sc().collectionAccumulator();
+                    JavaRDD<String> jsonRDD = cmpRDD.map(new WriteToJSON(new Object2ObjectOpenHashMap(tfidf.getTweetIDMap()),cmdArgs.numTopWords,topicWordAccumulator));
+
+                    System.out.println("resultPath:"+resultPath);
+                    logger.info("resultPath:"+resultPath);
+                    jsonRDD.coalesce(1,true).saveAsTextFile(resultPath);
+
+                    logger.info("get tNMijF top topic word list!");
+                    System.out.println("get tNMijF top topic word list!");
+                    topicWordList = new ObjectArrayList<String[]>(topicWordAccumulator.value());
+                }else if(cmdArgs.model.equals("coherence")){
+                    logger.info("compute coherence start!");
+                    System.out.println("compute coherence start!");
                     //model = "coherence"
                     logger.info("read topic word list!");
                     System.out.println("read topic word list!");

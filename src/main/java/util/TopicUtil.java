@@ -535,6 +535,23 @@ public class TopicUtil {
         }
     }
 
+    public static double getDecayRate(String strDateTime1, String strDateTime2) {
+        Date dateTime1 = null, dateTime2 = null;
+        try {
+            dateTime1 = new SimpleDateFormat(TopicConstant.DATE_FORMAT, Locale.ENGLISH).parse(strDateTime1);
+            dateTime2 = new SimpleDateFormat(TopicConstant.DATE_FORMAT, Locale.ENGLISH).parse(strDateTime2);
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return 1;
+        }
+
+        double dbWeighted = 0;
+        //modify to seconds
+        long diffT1T2 = Math.abs(dateTime1.getTime() - dateTime2.getTime())/1000;
+
+        dbWeighted = Math.exp(-(diffT1T2)/(double)CmdArgs.numTimeParam);
+        return dbWeighted;
+    }
     //coordinate matrix version
 //    private static class Tuple2DenseVectorPairFunction implements FlatMapFunction<Tuple2<Object,Tuple2<ArrayList<Object>,Optional<ArrayList<Object>>>>,Tuple2<Tuple2<Object, Object>, Object>> {
 //denseVecMatrix

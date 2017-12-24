@@ -21,7 +21,7 @@ public class CmdArgs {
     @Option(name="-output",usage="Sets a path of output")
     public static String outputFilePath;
 
-    @Option(name="-model",usage="Sets a model(DTTD , intJNMF , vector , coherence)")
+    @Option(name="-model",usage="Sets a model(PTD , intJNMF , vector , coherence , tNMijF)")
     public static String model;
 
     @Option(name="-cohInput",usage="Sets a coherence file input")
@@ -33,6 +33,9 @@ public class CmdArgs {
     @Option(name="-threshold",usage="Sets a number of threshold")
     public static int numThreshold = 3000;
 
-    @Option(name="-sample",usage="Sets a number of threshold")
+    @Option(name="-sample",usage="Sets a number of sample")
     public static int numSample = 0;
+
+    @Option(name="-timeParam",usage="Sets a timeParam")
+    public static int numTimeParam = 187;
 }

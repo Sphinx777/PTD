@@ -53,7 +53,7 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 			//for (Row row : tmpMentionList) {
 			//logger.info("collectAccumulator length:"+collectionAccumulator.value().size());
             System.out.println("tweetInfo size:"+tweetInfos.size());
-            for (int i = (int) tweetData.getTweetId() + 1; i < tweetInfos.size(); i++) {
+            for (int i = 0; i < tweetInfos.size(); i++) {
 				tweetInfo = tweetInfos.get(i);
 				//for(TweetInfo tweetInfo:tweetInfos){
 				//old
@@ -67,6 +67,10 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 					arr1 = tweetInfo.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
 					arr2 = tweetData.getMentionMen().split(TopicConstant.COMMA_DELIMITER);
 					dbValue = (double) TopicUtil.computeArrayIntersection(arr1, arr2) / TopicUtil.computeArrayUnion(arr1, arr2);
+
+					if(model.trim().toUpperCase().equals("TNMIJF")){
+						dbValue *= TopicUtil.getDecayRate(tweetData.getDateString(), tweetInfo.getDateString());
+					}
 					//logger.info("compute mention men finish");
 					//if(dbValue > 0){
 					//System.out.println();
@@ -99,7 +103,7 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 					//logger.info("compute cosine similarity finish");
 
 					//weighted by time-factor
-					if (model.trim().toUpperCase().equals("DTTD")) {
+					if (model.trim().toUpperCase().equals("PTD")) {
 						//old
 						//dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(), row.getAs("dateString").toString(), currDate);
 						//new
@@ -116,7 +120,7 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 					//logger.info("tweet id:"+ Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
 					//System.out.println("tweet id:"+Double.valueOf(tweetInfo.getTweetId())+",value:"+Double.valueOf(dbValue).doubleValue());
 				} else {
-					treeMap.put(tweetInfo.getTweetId(), 0.0);
+					treeMap.put(tweetInfo.getTweetId(), 1.0);
 				}
 			}
 
@@ -127,7 +131,7 @@ public class JoinMentionStringForPartition implements FlatMapFunction<Iterator<T
 
 			//double[] doubles = Arrays.copyOf(treeMap.values().toDoubleArray(),tweetInfos.size());
 
-			System.arraycopy(treeMap.values().toDoubleArray(), 0, doubles, (int) tweetData.getTweetId() + 1, treeMap.size());
+			System.arraycopy(treeMap.values().toDoubleArray(), 0, doubles, 0, treeMap.size());
 
 			denseVector = new DenseVector<Object>(doubles);
 

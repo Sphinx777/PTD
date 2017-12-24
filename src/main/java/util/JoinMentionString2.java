@@ -90,7 +90,7 @@ public class JoinMentionString2 implements FlatMapFunction<Iterator<TweetInfo>,T
 					//logger.info("compute cosine similarity finish");
 
 					//weighted by time-factor
-					if (model.trim().toUpperCase().equals("DTTD")) {
+					if (model.trim().toUpperCase().equals("PTD")) {
 						//old
 						//dbValue *= TopicUtil.getWeightedValue(tweetData.getDateString(), row.getAs("dateString").toString(), currDate);
 						//new
