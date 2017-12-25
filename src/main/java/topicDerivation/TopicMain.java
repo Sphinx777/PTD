@@ -96,15 +96,6 @@ public class TopicMain {
                 String outFilePath = cmdArgs.outputFilePath + "result_" + sdf.format((Date) broadcastCurrDate.getValue());
                 String resultPath = outFilePath + File.separator + "result";
 
-//                double[][] dbArray = new double[3][2];
-//
-//                for(int x=0;x<3;x++){
-//                    for(int y=0;y<2;y++){
-//                        dbArray[x][y]=(x+y)*2;
-//                    }
-//                }
-//                DenseVecMatrix dvm = new DenseVecMatrix(sc.sc(), dbArray, 2);
-
                 StructType schema = new StructType().add("polarity", "string").add("oldTweetId", "double").add("date", "string")
                         .add("noUse", "string").add("userName", "string").add("tweet", "string")
                         .add("mentionMen", "string").add("userInteraction", "string");
