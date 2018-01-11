@@ -4,6 +4,7 @@
 * This work includes some implementations of topic derivation model, such as intJNMF, tNMijf and PTD.
 * The implementation of the PTD is completed with the thesis of my M.S. degree in computer science.
 * The twitter dataset reference: 
+
 [`Twitter Sentiment Corpus`](http://www.sananalytics.com/lab/twitter-sentiment/)
 [`Sentiment140`](http://help.sentiment140.com/for-students/)
 
