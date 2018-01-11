@@ -1,5 +1,5 @@
 # Publishing-time-based Topic Derivation
-___
+
 `Author:Sphinx Chen`
 * This work includes some implementations of topic derivation model, such as intJNMF, tNMijf and PTD.
 * The implementation of the PTD is completed with the thesis of my M.S. degree in computer science.
@@ -16,7 +16,7 @@ ___
 * Performance compare
 
 ## Tutorial
-___
+
 ### Getting Started
 1. Environment check
 JDK 1.8+
@@ -92,19 +92,19 @@ The two folders `wordVector_<create_date>` and `corpus_<create_date>` are produc
 
 
 ## Issues
----
+
 *If any problems, please give me a feedback, thanks*
 ## Contact
-___
+
 [`Linkedin`](http://www.linkedin.com/in/sphinx-chen)
 [`Email`](mailto:hot.jun@msa.hinet.net)
 [`CakeResume`](https://goo.gl/Pa9469)
 ## Note
-___
+
 *The importation of [`Marlin's library`](https://goo.gl/VfWG5y) must be tuned carefully*
 *Special thanks to Professor KWang and everyone who helped me finish these experiments*
 ## Reference
-___
+
 intJNMF:
 [1]	R. Nugroho, J. Yang, Y. Zhong, C. Paris and S. Nepal, “Deriving Topics in Twitter by Exploiting Tweet Interactions,” in Proc. IEEE International Congress on Big Data, 2015.
 
