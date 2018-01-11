@@ -60,7 +60,8 @@ The parameter is not ordered, so you can decide the order by yourself.
 `-timeParam`: The time decay rate used in tNMijF model.
 
 ### Dataset format
-Just use following three field: 
+Just use following three field:
+ 
 Column Number|Value|Example
 :--:|--|:--
 2 | the date of the tweet |Sat May 16 23:58:44 UTC 2017
