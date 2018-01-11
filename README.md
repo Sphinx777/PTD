@@ -78,6 +78,7 @@ where hyper-parameters in `[ ]` are optional.
 **Output:**
 System console shows the current `max topic coherence value`, `average topic coherence value` and then output a folder `result_<create_date>`, there are `parameter`, `part-00000`(the top-word list) inside the `result` folder.
 
+
 #### tNMijF
 **Example:**
 *you must decide the timeParam first, please refer to* **[2]**.
@@ -95,6 +96,7 @@ System console shows the current `max topic coherence value`, `average topic coh
 
 **Output:**
 System console shows the current `max topic coherence value` and `average topic coherence value`.
+
 
 #### vector 
 **Example**
