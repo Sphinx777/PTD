@@ -38,15 +38,25 @@ Spark 2.0.2+
 The parameter is not ordered, so you can decide the order by yourself.
 
 `-iters`: The number of iterations for the topic models. The default value is 10.
+
 `-factor`: The number of result topics. The default value is 5.
+
 `-top`: The number of the top-N result for each topic. The default value is 10.
+
 `-input`: The path of the twitter dataset.
+
 `-output`: The path of the result. 
+
 `-model`: Determine the topic deriving model, such as PTD, intJNMF, tNMijF, vector and coherence.
+
 `-cohInput`: The path of topic word file.
+
 `-cores`: The number of cores which you set in the environment. The default value is 2.
+
 `-threshold`: The threshold of broadcasting variable. The unit of this parameter is MB, default value is 3000.
+
 `-sample`: The number of random sampling initial dataset. The default value is 0(all).
+
 `-timeParam`: The time decay rate used in tNMijF model.
 
 ### Dataset format
