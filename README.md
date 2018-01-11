@@ -92,7 +92,7 @@ The two folders `wordVector_<create_date>` and `corpus_<create_date>` are produc
 
 
 ## Issues
-___
+---
 *If any problems, please give me a feedback, thanks*
 ## Contact
 ___
