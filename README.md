@@ -6,6 +6,7 @@
 * The twitter dataset reference: 
 
 [`Twitter Sentiment Corpus`](http://www.sananalytics.com/lab/twitter-sentiment/)
+
 [`Sentiment140`](http://help.sentiment140.com/for-students/)
 
 ### Table Content
