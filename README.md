@@ -100,31 +100,36 @@ System console shows the current `max topic coherence value` and `average topic 
 ---
 
 #### vector 
-**Example**
+**Example:**
 `/usr/lib/spark/bin/spark-submit <user_defined_path>/app.jar -iters 10 -factor 5 -top 10 -input <input_file_path> -output <output_folder_path> -model vector`
 
-**Output**
+**Output:**
 The two folders `wordVector_<create_date>` and `corpus_<create_date>` are produced, show the latent vector for each word and the word corpus.
 
 
 ## Issues
 
-*If any problems, please give me a feedback, thanks*
+*If any problems, please give me a feedback, thanks.*
 ## Contact
 
 [`Linkedin`](http://www.linkedin.com/in/sphinx-chen)
+
 [`Email`](mailto:hot.jun@msa.hinet.net)
+
 [`CakeResume`](https://goo.gl/Pa9469)
 ## Note
 
 *The importation of [`Marlin's library`](https://goo.gl/VfWG5y) must be tuned carefully*
+
 *Special thanks to Professor KWang and everyone who helped me finish these experiments*
 ## Reference
 
 intJNMF:
+
 [1]	R. Nugroho, J. Yang, Y. Zhong, C. Paris and S. Nepal, “Deriving Topics in Twitter by Exploiting Tweet Interactions,” in Proc. IEEE International Congress on Big Data, 2015.
 
 tNMijF:
+
 [2]	R. Nugroho, W. Zhao, J. Yang, C. Paris, and S. Nepal, “Using time-sensitive interactions to improve topic derivation in twitter,” World Wide Web, vol. 20, no. 1, pp. 61–87, Jun. 2016.
 
 :smile:
